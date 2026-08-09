@@ -1,0 +1,198 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  native-amd64:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux/amd64 gcc epoll
+            artifact: linux-amd64-gcc-epoll
+            preset: epoll
+            bootstrap: epoll
+            cc: gcc
+            cxx: g++
+            install_liburing: false
+          - name: linux/amd64 clang epoll
+            artifact: linux-amd64-clang-epoll
+            preset: epoll
+            bootstrap: epoll
+            cc: clang
+            cxx: clang++
+            install_liburing: false
+          - name: linux/amd64 gcc io_uring
+            artifact: linux-amd64-gcc-uring
+            preset: uring
+            bootstrap: uring
+            cc: gcc
+            cxx: g++
+            install_liburing: true
+          - name: linux/amd64 gcc ASan
+            artifact: linux-amd64-gcc-asan
+            preset: asan
+            bootstrap: asan
+            cc: gcc
+            cxx: g++
+            install_liburing: false
+          - name: linux/amd64 gcc UBSan
+            artifact: linux-amd64-gcc-ubsan
+            preset: ubsan
+            bootstrap: ubsan
+            cc: gcc
+            cxx: g++
+            install_liburing: false
+          - name: linux/amd64 clang TSan
+            artifact: linux-amd64-clang-tsan
+            preset: tsan
+            bootstrap: tsan
+            cc: clang
+            cxx: clang++
+            install_liburing: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Check source implementation
+        id: source
+        run: |
+          if [ -f CMakeLists.txt ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            mkdir -p "build/artifacts/${{ matrix.preset }}"
+            echo "Task 0 only: CMakeLists.txt starts in Task 1, so build is skipped." > "build/artifacts/${{ matrix.preset }}/task0-skip.log"
+          fi
+      - name: Install liburing
+        if: steps.source.outputs.exists == 'true' && matrix.install_liburing
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y liburing-dev
+      - name: Bootstrap host
+        if: steps.source.outputs.exists == 'true'
+        run: ./scripts/bootstrap-dev.sh "${{ matrix.bootstrap }}"
+      - name: Configure, build, and test
+        if: steps.source.outputs.exists == 'true'
+        run: ./scripts/ci.sh "${{ matrix.preset }}"
+        env:
+          CC: ${{ matrix.cc }}
+          CXX: ${{ matrix.cxx }}
+          ASAN_OPTIONS: halt_on_error=1:abort_on_error=1
+          UBSAN_OPTIONS: halt_on_error=1
+          TSAN_OPTIONS: halt_on_error=1
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-logs-${{ matrix.artifact }}
+          path: build/artifacts/${{ matrix.preset }}
+          if-no-files-found: warn
+
+  native-arm64:
+    name: ${{ matrix.name }}
+    if: ${{ vars.VELOCO_ENABLE_ARM64_CI == 'true' }}
+    runs-on: [self-hosted, Linux, ARM64]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux/arm64 gcc epoll
+            artifact: linux-arm64-gcc-epoll
+            preset: epoll
+            bootstrap: epoll
+            cc: gcc
+            cxx: g++
+            install_liburing: false
+          - name: linux/arm64 gcc io_uring
+            artifact: linux-arm64-gcc-uring
+            preset: uring
+            bootstrap: uring
+            cc: gcc
+            cxx: g++
+            install_liburing: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Check source implementation
+        id: source
+        run: |
+          if [ -f CMakeLists.txt ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            mkdir -p "build/artifacts/${{ matrix.preset }}"
+            echo "Task 0 only: CMakeLists.txt starts in Task 1, so build is skipped." > "build/artifacts/${{ matrix.preset }}/task0-skip.log"
+          fi
+      - name: Install liburing
+        if: steps.source.outputs.exists == 'true' && matrix.install_liburing
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y liburing-dev
+      - name: Bootstrap host
+        if: steps.source.outputs.exists == 'true'
+        run: ./scripts/bootstrap-dev.sh "${{ matrix.bootstrap }}"
+      - name: Configure, build, and test
+        if: steps.source.outputs.exists == 'true'
+        run: ./scripts/ci.sh "${{ matrix.preset }}"
+        env:
+          CC: ${{ matrix.cc }}
+          CXX: ${{ matrix.cxx }}
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-logs-${{ matrix.artifact }}
+          path: build/artifacts/${{ matrix.preset }}
+          if-no-files-found: warn
+
+  runtime-smoke:
+    name: Docker runtime smoke
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Check for runtime binary
+        id: binary
+        run: |
+          mkdir -p build/artifacts/runtime
+          if compgen -G "bin/veloco-httpd" >/dev/null || compgen -G "build/*/veloco-httpd" >/dev/null; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "runtime binary present" > build/artifacts/runtime/smoke.log
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "runtime smoke test skipped: veloco-httpd binary expected from Task 8" > build/artifacts/runtime/smoke.log
+          fi
+      - name: Build and smoke-test runtime image
+        if: steps.binary.outputs.exists == 'true'
+        run: |
+          set -euo pipefail
+          log=build/artifacts/runtime/smoke.log
+          trap 'docker compose -f deploy/compose.yaml down >/dev/null 2>&1 || true' EXIT
+          docker compose -f deploy/compose.yaml build 2>&1 | tee -a "${log}"
+          docker compose -f deploy/compose.yaml up --detach --wait 2>&1 | tee -a "${log}"
+          curl --fail --silent --show-error "http://127.0.0.1:${VELOCO_HOST_PORT:-8080}/health" 2>&1 | tee -a "${log}"
+        env:
+          VELOCO_HTTPD_BINARY: build/uring/veloco-httpd
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-logs-runtime-smoke
+          path: build/artifacts/runtime
+          if-no-files-found: warn

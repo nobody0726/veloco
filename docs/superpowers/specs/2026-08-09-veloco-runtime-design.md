@@ -2,12 +2,13 @@
 
 Date: 2026-08-09
 
-Status: Approved design for implementation planning
+Status: Approved design for implementation planning; updated for Linux arm64 support
 
 ## 1. Project Positioning
 
-Veloco is a Linux x86_64 C runtime and HTTP/1.1 server built by
-reconstructing and extending the existing `ef` coroutine framework.
+Veloco is a Linux x86_64 and Linux arm64 C runtime plus HTTP/1.1 server
+built by reconstructing and extending the existing `ef` coroutine
+framework.
 
 The project has three connected goals:
 
@@ -19,8 +20,9 @@ The project has three connected goals:
 3. Extend the system vertically into a usable HTTP/1.1 server with
    benchmarks, diagnostics, failure tests, and engineering documentation.
 
-The project is intentionally Linux x86_64 first. Portability is not part
-of the first release.
+The project is intentionally Linux-first for x86_64 and arm64.
+Portability to other operating systems or CPU families is not part of
+the first release.
 
 The term `tmalloc` is interpreted as a request for a simplified
 TCMalloc-like allocator. The allocator uses a similar layered topology,
@@ -30,7 +32,7 @@ but it does not implement garbage collection.
 
 ### In scope
 
-- x86_64 fiber context switching and guarded, growable stacks
+- x86_64 and arm64 fiber context switching with guarded, growable stacks
 - A standalone Task abstraction above fibers
 - Cooperative scheduling
 - Fixed-size G/P/M runtime with local queues and work stealing
@@ -101,8 +103,27 @@ HTTP Server / Router / Middleware
        |                         |
   io_uring primary          epoll fallback
        |
- Linux x86_64 / pthread / atomics / mmap / sockets
+ Linux x86_64 or arm64 / pthread / atomics / mmap / sockets
 ```
+
+### Architecture Support Strategy
+
+Linux x86_64 and Linux arm64 are both first-class native targets. The
+runtime keeps platform-specific code isolated behind small boundaries:
+
+- `src/fiber/fiber_x86_64.S` implements System V x86_64 context
+  switching.
+- `src/fiber/fiber_aarch64.S` implements AArch64 PCS context switching.
+- Shared C code selects the assembly backend through build-system
+  architecture detection, not through public API differences.
+- `docs/architecture/fiber.md` records the register layout, stack
+  alignment, trampoline contract, and sanitizer notes for both ABIs.
+- CI always validates Linux x86_64. Native Linux arm64 validation runs on
+  a self-hosted ARM64 runner when repository variable
+  `VELOCO_ENABLE_ARM64_CI=true` is enabled.
+- Benchmark reports keep x86_64 and arm64 machines in separate sections.
+  Emulated or cross-platform container runs are correctness-only and
+  must never be used as performance claims.
 
 Suggested repository layout:
 
@@ -516,7 +537,7 @@ count, and SQE/CQE batch sizes.
 
 The two-to-three-month release is complete when:
 
-1. Linux x86_64 builds reproducibly.
+1. Linux x86_64 and Linux arm64 builds are reproducible on native hosts.
 2. The HTTP server supports concurrent connections, Keep-Alive,
    deadlines, and graceful shutdown.
 3. Waiting for I/O or a runtime synchronization primitive does not block
@@ -528,7 +549,8 @@ The two-to-three-month release is complete when:
 6. The multi-thread version shows a measured throughput improvement over
    the single-thread version on the same machine and workload.
 7. Stress and sanitizer runs have no known memory errors.
-8. The repository contains comparative benchmark data and design notes.
+8. The repository contains comparative benchmark data and design notes,
+   separated by native CPU architecture.
 
 ## 14. Risks and Mitigations
 

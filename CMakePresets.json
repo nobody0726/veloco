@@ -1,0 +1,173 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 22,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "dev",
+      "displayName": "Veloco development",
+      "description": "Debug build for Linux x86_64 or arm64 with io_uring enabled; requires liburing",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/dev",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_C_FLAGS": "-Wall -Wextra -Werror",
+        "VELOCO_ENABLE_URING": "ON",
+        "VELOCO_ENABLE_SANITIZERS": "OFF"
+      }
+    },
+    {
+      "name": "epoll",
+      "displayName": "Veloco epoll fallback",
+      "description": "RelWithDebInfo build for Linux x86_64 or arm64 with io_uring disabled and the epoll backend enabled",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/epoll",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CMAKE_C_FLAGS": "-Wall -Wextra -Werror",
+        "VELOCO_ENABLE_URING": "OFF",
+        "VELOCO_ENABLE_SANITIZERS": "OFF"
+      }
+    },
+    {
+      "name": "uring",
+      "displayName": "Veloco io_uring",
+      "description": "RelWithDebInfo build for Linux x86_64 or arm64 with io_uring enabled; implies liburing development files",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/uring",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CMAKE_C_FLAGS": "-Wall -Wextra -Werror",
+        "VELOCO_ENABLE_URING": "ON",
+        "VELOCO_ENABLE_SANITIZERS": "OFF"
+      }
+    },
+    {
+      "name": "asan",
+      "displayName": "Veloco AddressSanitizer",
+      "description": "Debug build for Linux x86_64 or arm64 with AddressSanitizer and warnings as errors",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/asan",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_C_FLAGS": "-Wall -Wextra -Werror -fsanitize=address -fno-omit-frame-pointer",
+        "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=address",
+        "VELOCO_ENABLE_URING": "OFF",
+        "VELOCO_ENABLE_SANITIZERS": "ON"
+      }
+    },
+    {
+      "name": "ubsan",
+      "displayName": "Veloco UndefinedBehaviorSanitizer",
+      "description": "Debug build for Linux x86_64 or arm64 with UndefinedBehaviorSanitizer and warnings as errors",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/ubsan",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_C_FLAGS": "-Wall -Wextra -Werror -fsanitize=undefined -fno-omit-frame-pointer",
+        "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=undefined",
+        "VELOCO_ENABLE_URING": "OFF",
+        "VELOCO_ENABLE_SANITIZERS": "ON"
+      }
+    },
+    {
+      "name": "tsan",
+      "displayName": "Veloco ThreadSanitizer",
+      "description": "Debug build for Linux x86_64 or arm64 with ThreadSanitizer for supported tests; io_uring disabled",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/tsan",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_C_FLAGS": "-Wall -Wextra -Werror -fsanitize=thread -fno-omit-frame-pointer",
+        "CMAKE_EXE_LINKER_FLAGS": "-fsanitize=thread",
+        "VELOCO_ENABLE_URING": "OFF",
+        "VELOCO_ENABLE_SANITIZERS": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "dev",
+      "configurePreset": "dev"
+    },
+    {
+      "name": "epoll",
+      "configurePreset": "epoll"
+    },
+    {
+      "name": "uring",
+      "configurePreset": "uring"
+    },
+    {
+      "name": "asan",
+      "configurePreset": "asan"
+    },
+    {
+      "name": "ubsan",
+      "configurePreset": "ubsan"
+    },
+    {
+      "name": "tsan",
+      "configurePreset": "tsan"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "dev",
+      "configurePreset": "dev"
+    },
+    {
+      "name": "epoll",
+      "configurePreset": "epoll"
+    },
+    {
+      "name": "uring",
+      "configurePreset": "uring"
+    },
+    {
+      "name": "asan",
+      "configurePreset": "asan"
+    },
+    {
+      "name": "ubsan",
+      "configurePreset": "ubsan"
+    },
+    {
+      "name": "tsan",
+      "configurePreset": "tsan"
+    }
+  ]
+}

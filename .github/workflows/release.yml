@@ -1,0 +1,116 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ${{ vars.REGISTRY || 'ghcr.io' }}
+  IMAGE_NAME: ${{ vars.IMAGE_NAME || 'veloco/veloco-httpd' }}
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  release-amd64:
+    name: Build and publish linux/amd64 release
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install liburing
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y liburing-dev
+      - name: Bootstrap host
+        run: ./scripts/bootstrap-dev.sh uring
+      - name: Configure, build, and test
+        run: ./scripts/ci.sh uring
+        env:
+          CC: gcc
+          CXX: g++
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: veloco-httpd-${{ github.ref_name }}-linux-amd64
+          path: build/uring/veloco-httpd
+          if-no-files-found: error
+      - name: Build runtime image
+        run: |
+          docker build --platform linux/amd64 \
+            --build-arg VELOCO_HTTPD_BINARY=build/uring/veloco-httpd \
+            -f docker/runtime.Dockerfile \
+            -t "$REGISTRY/$IMAGE_NAME:$GITHUB_REF_NAME-amd64" .
+      - name: Log in to container registry
+        if: secrets.REGISTRY_USERNAME != '' && secrets.REGISTRY_PASSWORD != ''
+        env:
+          REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+        run: echo "$REGISTRY_PASSWORD" | docker login "$REGISTRY" --username "$REGISTRY_USERNAME" --password-stdin
+      - name: Publish image
+        if: secrets.REGISTRY_USERNAME != '' && secrets.REGISTRY_PASSWORD != ''
+        run: docker push "$REGISTRY/$IMAGE_NAME:$GITHUB_REF_NAME-amd64"
+      - name: Upload build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-logs-${{ github.ref_name }}-linux-amd64
+          path: build/artifacts/uring
+          if-no-files-found: warn
+
+  release-arm64:
+    name: Build and publish linux/arm64 release
+    if: ${{ vars.VELOCO_ENABLE_ARM64_CI == 'true' }}
+    runs-on: [self-hosted, Linux, ARM64]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install liburing
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y liburing-dev
+      - name: Bootstrap host
+        run: ./scripts/bootstrap-dev.sh uring
+      - name: Configure, build, and test
+        run: ./scripts/ci.sh uring
+        env:
+          CC: gcc
+          CXX: g++
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: veloco-httpd-${{ github.ref_name }}-linux-arm64
+          path: build/uring/veloco-httpd
+          if-no-files-found: error
+      - name: Build runtime image
+        run: |
+          docker build --platform linux/arm64 \
+            --build-arg VELOCO_HTTPD_BINARY=build/uring/veloco-httpd \
+            -f docker/runtime.Dockerfile \
+            -t "$REGISTRY/$IMAGE_NAME:$GITHUB_REF_NAME-arm64" .
+      - name: Log in to container registry
+        if: secrets.REGISTRY_USERNAME != '' && secrets.REGISTRY_PASSWORD != ''
+        env:
+          REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+        run: echo "$REGISTRY_PASSWORD" | docker login "$REGISTRY" --username "$REGISTRY_USERNAME" --password-stdin
+      - name: Publish image
+        if: secrets.REGISTRY_USERNAME != '' && secrets.REGISTRY_PASSWORD != ''
+        run: docker push "$REGISTRY/$IMAGE_NAME:$GITHUB_REF_NAME-arm64"
+      - name: Upload build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-logs-${{ github.ref_name }}-linux-arm64
+          path: build/artifacts/uring
+          if-no-files-found: warn
+
+# Registry and image name are configurable through repository variables
+# REGISTRY and IMAGE_NAME. Publishing uses REGISTRY_USERNAME and
+# REGISTRY_PASSWORD secrets when present. Enable VELOCO_ENABLE_ARM64_CI
+# after attaching a native Linux ARM64 self-hosted runner.

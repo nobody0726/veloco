@@ -1,0 +1,17 @@
+.git
+.github
+docs
+scripts
+deploy
+tests
+benchmarks
+examples
+src
+include
+CMakePresets.json
+.clang-format
+.gitignore
+README.md
+build/*
+!build/uring/
+!build/uring/veloco-httpd

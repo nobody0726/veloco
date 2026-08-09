@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build a Linux x86_64 C runtime and HTTP/1.1 server that evolves the existing `ef` fiber/event-loop code into a G/P/M scheduler with a Go/tcmalloc-inspired allocator and an io_uring-first asynchronous I/O layer.
+**Goal:** Build a Linux x86_64 and Linux arm64 C runtime plus HTTP/1.1 server that evolves the existing `ef` fiber/event-loop code into a G/P/M scheduler with a Go/tcmalloc-inspired allocator and an io_uring-first asynchronous I/O layer.
 
 **Architecture:** Treat `ef/` as a black-box behavior and benchmark reference only. Build Veloco as a new layered implementation under `include/`, `src/`, `tests/`, `benchmarks/`, and `examples/`; do not copy its source, headers, assembly, or tests. Start with a single-thread Task runtime and allocator, then add fixed G/P/M scheduling, io_uring, and HTTP. Keep epoll behind the same backend interface as a fallback and comparison target.
 
-**Tech Stack:** C11/GNU11, Linux x86_64, pthreads, C11 atomics, mmap/mprotect, epoll, eventfd, io_uring through system liburing, CMake presets, gcc/clang, ASan/UBSan/TSan, perf, wrk or ApacheBench, Docker, and GitHub Actions.
+**Tech Stack:** C11/GNU11, Linux x86_64 and Linux arm64, pthreads, C11 atomics, mmap/mprotect, epoll, eventfd, io_uring through system liburing, CMake presets, gcc/clang, ASan/UBSan/TSan, perf, wrk or ApacheBench, Docker, GitHub Actions, and an optional self-hosted Linux ARM64 runner.
 
 ---
 
@@ -41,6 +41,7 @@
 - Create: `include/veloco/memory.h` - `vl_malloc`, `vl_free`, arenas, pools, and allocator statistics.
 - Create: `include/veloco/io.h` - backend-neutral async accept/recv/send/connect/timeout API.
 - Create: `include/veloco/sync.h` - Task-parking mutex, semaphore, wait group, and channel API.
+- Create: `include/veloco/timer.h` - Task deadlines, timer handles, and timer statistics.
 - Create: `include/veloco/http.h` - HTTP server, request, response, router, and middleware API.
 
 ### Runtime implementation
@@ -48,6 +49,7 @@
 - Create: `src/common/error.c` - error string mapping and error construction.
 - Create: `src/fiber/fiber.c` - mmap stack allocation, guard page, stack growth, and fiber lifecycle.
 - Create: `src/fiber/fiber_x86_64.S` - System V x86_64 context save/restore and first-entry trampoline.
+- Create: `src/fiber/fiber_aarch64.S` - AArch64 PCS context save/restore and first-entry trampoline.
 - Create: `src/runtime/task.c` - Task lifecycle and state transitions.
 - Create: `src/runtime/run_queue.c` - local queue, global queue, and stealing operations.
 - Create: `src/runtime/scheduler.c` - single-thread scheduler first, then G/P/M coordination.
@@ -113,7 +115,7 @@
 
 ### Development and delivery
 
-- Create: `docker/dev.Dockerfile` - pinned Linux x86_64 development image.
+- Create: `docker/dev.Dockerfile` - pinned Linux x86_64 and Linux arm64 development image.
 - Create: `docker/runtime.Dockerfile` - minimal image for the HTTP server.
 - Create: `deploy/compose.yaml` - local server smoke deployment.
 - Create: `scripts/bootstrap-dev.sh` - native dependency/setup verification.
@@ -202,37 +204,42 @@ list -> page heap -> mmap and the cross-P remote-free path.
 
 `docker/dev.Dockerfile` must install the compiler/toolchain, CMake,
 Ninja, liburing development headers, gdb, perf, and sanitizer support.
-Pin the base image tag and document the required `linux/amd64` platform.
+Pin the base image tag and document both supported platforms:
+`linux/amd64` and `linux/arm64`.
 
 Run:
 
 ```bash
 docker build --platform linux/amd64 -f docker/dev.Dockerfile -t veloco-dev .
 docker run --rm -it --platform linux/amd64 -v "$PWD:/workspace" -w /workspace veloco-dev
+docker build --platform linux/arm64 -f docker/dev.Dockerfile -t veloco-dev:arm64 .
+docker run --rm -it --platform linux/arm64 -v "$PWD:/workspace" -w /workspace veloco-dev:arm64
 ```
 
 Expected: the container can run the same CMake configure command used by
-CI. Native Linux builds may be used for performance measurements; a
-virtualized or emulated build is correctness-only.
+CI on both supported native architectures. Virtualized, cross-platform,
+or emulated builds are correctness-only and must not be mixed with
+native performance baselines.
 
 - [ ] **Step 4: Add CMake presets and setup scripts**
 
 Define presets named `dev`, `epoll`, `uring`, `asan`, `ubsan`, and
-`tsan`. `scripts/bootstrap-dev.sh` checks for Linux x86_64, CMake,
-compiler, pthread support, and liburing when the uring preset is used.
-`scripts/ci.sh` accepts a preset, builds, runs CTest, and writes logs to
-`build/artifacts/`.
+`tsan`. `scripts/bootstrap-dev.sh` checks for Linux x86_64 or arm64,
+CMake, compiler, pthread support, and liburing when the selected preset
+needs io_uring. `scripts/ci.sh` accepts only a whitelisted preset,
+builds, runs CTest, and writes logs to `build/artifacts/`.
 
 Run:
 
 ```bash
-cmake --preset epoll
-cmake --build --preset epoll
-ctest --preset epoll --output-on-failure
+cmake --list-presets
+bash -n scripts/bootstrap-dev.sh
+bash -n scripts/ci.sh
 ```
 
-Expected: a fresh checkout can configure and test without manually
-editing compiler flags.
+Expected: all six presets are listed, and both scripts pass shell
+syntax validation. Full configure, build, and CTest verification moves
+to Task 1, which creates the root `CMakeLists.txt`.
 
 - [ ] **Step 5: Add CI validation and artifact publishing**
 
@@ -245,16 +252,17 @@ gcc + io_uring
 gcc + ASan/UBSan
 clang + TSan for supported tests
 container build + HTTP smoke test
+optional native arm64 epoll + io_uring on a self-hosted ARM64 runner
 ```
 
 Each job uploads build logs and sanitizer output. The workflow must fail
 on compiler warnings, test failures, or an HTTP smoke failure.
 
-`.github/workflows/release.yml` runs only for a version tag, builds the
-Linux binary and runtime image, uploads the binary as a workflow
-artifact, and publishes the image to a configurable registry. No
-production deployment target is assumed before a registry and host are
-chosen.
+`.github/workflows/release.yml` runs only for a version tag, builds
+architecture-labeled Linux binaries and runtime images, uploads the
+binary as a workflow artifact, and publishes images to a configurable
+registry. No production deployment target is assumed before a registry
+and host are chosen.
 
 - [ ] **Step 6: Verify the environment before source implementation**
 
@@ -262,14 +270,14 @@ Run:
 
 ```bash
 ./scripts/bootstrap-dev.sh
-./scripts/ci.sh epoll
-./scripts/ci.sh uring
-docker compose -f deploy/compose.yaml up --build --abort-on-container-exit
+./scripts/bootstrap-dev.sh epoll
 ```
 
-Expected: the scripts either pass or report one concrete missing host
-capability. No source implementation begins until the epoll build and
-the development container are reproducible.
+Expected: the script either passes or reports one concrete missing host
+capability for x86_64 or arm64. Dockerfile syntax and compose validation
+are checked if the local Docker CLI is available; otherwise the
+container build is deferred to the first CI run. `scripts/ci.sh`
+execution starts in Task 1 after the root `CMakeLists.txt` exists.
 
 - [ ] **Step 7: Commit the environment and domain baseline when Git is available**
 
@@ -369,6 +377,7 @@ git commit -m "Establish a reproducible Veloco build and ef baseline"
 - Create: `include/veloco/fiber.h`
 - Create: `src/fiber/fiber.c`
 - Create: `src/fiber/fiber_x86_64.S`
+- Create: `src/fiber/fiber_aarch64.S`
 - Create: `tests/test_fiber.c`
 - Create: `docs/architecture/fiber.md`
 
@@ -403,12 +412,16 @@ page. The test must assert the exact event order:
 main -> fiber-a -> fiber-b -> fiber-a -> main
 ```
 
-- [ ] **Step 3: Implement the x86_64 context layout**
+- [ ] **Step 3: Implement the architecture-specific context layouts**
 
-Save and restore the System V callee-saved registers, stack pointer, and
-return address in `src/fiber/fiber_x86_64.S`. Use a C trampoline that
-marks the fiber done, stores its result, and yields to its parent when
-the user function returns.
+Save and restore the System V x86_64 callee-saved registers, stack
+pointer, and return address in `src/fiber/fiber_x86_64.S`. Save and
+restore the AArch64 PCS callee-saved registers, stack pointer, frame
+pointer, and link register in `src/fiber/fiber_aarch64.S`. Use a shared
+C trampoline that marks the fiber done, stores its result, and yields to
+its parent when the user function returns. `docs/architecture/fiber.md`
+must include stack alignment, register layout, and first-entry
+trampoline diagrams for both ABIs.
 
 - [ ] **Step 4: Implement guarded lazy stack mapping**
 
@@ -974,14 +987,16 @@ benchmark artifacts that identify the exact configuration used.
 - `ef/` is never a source or test dependency; it is used only for black-box
   baseline behavior and comparative benchmarking.
 - Local correctness is reproducible in the Linux development container,
-  while performance claims are made only from native Linux x86_64 runs.
-- CI validates epoll, io_uring, sanitizers, and the container smoke path
-  before a tagged release can publish artifacts.
+  while performance claims are made only from native Linux x86_64 and
+  native Linux arm64 runs, recorded separately.
+- CI validates epoll, io_uring, sanitizers, optional native arm64, and
+  the container smoke path before a tagged release can publish artifacts.
 - No deferred feature is required by the first-release acceptance
   criteria.
 
 ### Known verification gap
 
-The workspace has no Git metadata, so commit commands cannot be executed
-in the current environment. No source implementation has been changed
-by this plan.
+Task 0 intentionally creates environment and documentation scaffolding
+before source implementation. Full configure/build/CTest verification
+starts in Task 1 when `CMakeLists.txt` and the first test target are
+introduced.
