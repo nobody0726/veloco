@@ -145,7 +145,7 @@
 - Create: `docs/diagrams/io-completion.md`
 - Create: `docs/diagrams/allocator.md`
 
-- [ ] **Step 1: Establish the vocabulary and bounded contexts**
+- [x] **Step 1: Establish the vocabulary and bounded contexts**
 
 Define these terms before implementation:
 
@@ -174,7 +174,7 @@ lifecycle, Async I/O owns kernel operation completion, and HTTP owns
 protocol behavior. Add the first context map to
 `docs/domain/bounded-contexts.md`.
 
-- [ ] **Step 2: Add the initial Mermaid diagrams**
+- [x] **Step 2: Add the initial Mermaid diagrams**
 
 `docs/diagrams/system-context.md` must show Application -> HTTP ->
 Runtime -> Async I/O/Memory -> Linux.
@@ -200,7 +200,7 @@ completion, generation validation, and wakeup.
 `docs/diagrams/allocator.md` must show P-local cache -> central free
 list -> page heap -> mmap and the cross-P remote-free path.
 
-- [ ] **Step 3: Create the reproducible local development image**
+- [x] **Step 3: Create the reproducible local development image**
 
 `docker/dev.Dockerfile` must install the compiler/toolchain, CMake,
 Ninja, liburing development headers, gdb, perf, and sanitizer support.
@@ -221,7 +221,7 @@ CI on both supported native architectures. Virtualized, cross-platform,
 or emulated builds are correctness-only and must not be mixed with
 native performance baselines.
 
-- [ ] **Step 4: Add CMake presets and setup scripts**
+- [x] **Step 4: Add CMake presets and setup scripts**
 
 Define presets named `dev`, `epoll`, `uring`, `asan`, `ubsan`, and
 `tsan`. `scripts/bootstrap-dev.sh` checks for Linux x86_64 or arm64,
@@ -241,7 +241,7 @@ Expected: all six presets are listed, and both scripts pass shell
 syntax validation. Full configure, build, and CTest verification moves
 to Task 1, which creates the root `CMakeLists.txt`.
 
-- [ ] **Step 5: Add CI validation and artifact publishing**
+- [x] **Step 5: Add CI validation and artifact publishing**
 
 `.github/workflows/ci.yml` must run:
 
@@ -264,7 +264,7 @@ binary as a workflow artifact, and publishes images to a configurable
 registry. No production deployment target is assumed before a registry
 and host are chosen.
 
-- [ ] **Step 6: Verify the environment before source implementation**
+- [x] **Step 6: Verify the environment before source implementation**
 
 Run:
 
@@ -279,7 +279,7 @@ are checked if the local Docker CLI is available; otherwise the
 container build is deferred to the first CI run. `scripts/ci.sh`
 execution starts in Task 1 after the root `CMakeLists.txt` exists.
 
-- [ ] **Step 7: Commit the environment and domain baseline when Git is available**
+- [x] **Step 7: Commit the environment and domain baseline when Git is available**
 
 ```bash
 git add README.md CMakePresets.json .clang-format docker deploy scripts .github docs/domain docs/diagrams .dockerignore
