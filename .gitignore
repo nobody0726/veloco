@@ -1,0 +1,11 @@
+build/
+build-*/
+.cache/
+.DS_Store
+*.o
+*.a
+*.so
+*.dylib
+*.exe
+*.log
+*.tmp
