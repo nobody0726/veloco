@@ -7,11 +7,11 @@
 #
 # Supported platforms: linux/amd64 and linux/arm64
 #   docker build --platform linux/amd64 \
-#     --build-arg VELOCO_HTTPD_BINARY=build/uring/veloco-httpd \
+#     --build-arg VELOCO_HTTPD_BINARY=build/x86_64/uring/veloco-httpd \
 #     -f docker/runtime.Dockerfile -t veloco-httpd:local .
 FROM ubuntu:24.04
 
-ARG VELOCO_HTTPD_BINARY=build/uring/veloco-httpd
+ARG VELOCO_HTTPD_BINARY=build/x86_64/uring/veloco-httpd
 
 COPY "${VELOCO_HTTPD_BINARY}" /usr/local/bin/veloco-httpd
 

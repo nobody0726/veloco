@@ -297,7 +297,7 @@ git commit -m "Define Veloco domain model and reproducible development environme
 - Create: `docs/benchmarks/baseline.md`
 - Modify: none under `ef/`
 
-- [ ] **Step 1: Add a dependency-free test harness**
+- [x] **Step 1: Add a dependency-free test harness**
 
 Define the smallest usable test API:
 
@@ -314,7 +314,7 @@ int vl_test_run_all(void);
 Register tests explicitly from `tests/test_main.c`, and return nonzero
 when any assertion fails.
 
-- [ ] **Step 2: Add the initial CMake targets**
+- [x] **Step 2: Add the initial CMake targets**
 
 Create a `veloco_tests` target that builds the test harness and a
 placeholder common test. Add options:
@@ -328,7 +328,7 @@ Use `find_package(Threads REQUIRED)`. Detect liburing only when
 `VELOCO_ENABLE_URING` is enabled; keep the epoll-only target buildable
 when liburing is unavailable.
 
-- [ ] **Step 3: Build and run the empty harness**
+- [x] **Step 3: Build and run the empty harness**
 
 Run:
 
@@ -341,7 +341,7 @@ ctest --test-dir build --output-on-failure
 Expected: configure succeeds, the test binary builds, and CTest reports
 the initial test as passed.
 
-- [ ] **Step 4: Record the original `ef` baseline**
+- [x] **Step 4: Record the original `ef` baseline**
 
 Run the existing example using its supported build target and record
 behavior only. Do not copy any source, header, assembly, utility, or test
@@ -364,7 +364,7 @@ Also update `docs/domain/ubiquitous-language.md` with any terminology
 learned while observing the baseline. The baseline may document `ef`
 behavior, but it must not become a Veloco implementation dependency.
 
-- [ ] **Step 5: Commit the build baseline when Git is available**
+- [x] **Step 5: Commit the build baseline when Git is available**
 
 ```bash
 git add CMakeLists.txt include/veloco/common.h tests docs/benchmarks/baseline.md

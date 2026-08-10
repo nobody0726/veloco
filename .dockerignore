@@ -13,5 +13,9 @@ CMakePresets.json
 .gitignore
 README.md
 build/*
-!build/uring/
-!build/uring/veloco-httpd
+!build/x86_64/
+!build/x86_64/uring/
+!build/x86_64/uring/veloco-httpd
+!build/aarch64/
+!build/aarch64/uring/
+!build/aarch64/uring/veloco-httpd

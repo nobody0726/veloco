@@ -2,15 +2,15 @@ name: veloco
 
 # Local smoke deployment for the future HTTP server. The binary is
 # expected from Task 8; `docker compose up --build` fails until
-# build/uring/veloco-httpd exists. No production registry or host is
-# assumed.
+# build/x86_64/uring/veloco-httpd or build/aarch64/uring/veloco-httpd
+# exists. No production registry or host is assumed.
 services:
   httpd:
     build:
       context: ..
       dockerfile: docker/runtime.Dockerfile
       args:
-        VELOCO_HTTPD_BINARY: ${VELOCO_HTTPD_BINARY:-build/uring/veloco-httpd}
+        VELOCO_HTTPD_BINARY: ${VELOCO_HTTPD_BINARY:-build/x86_64/uring/veloco-httpd}
     image: veloco-httpd:local
     ports:
       - "${VELOCO_HOST_PORT:-8080}:8080"

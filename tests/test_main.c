@@ -1,0 +1,76 @@
+#include "test.h"
+
+#include <veloco/common.h>
+
+#include <stddef.h>
+#include <stdio.h>
+
+#define VL_TEST_CAPACITY 64
+
+typedef struct vl_test_case {
+    const char *name;
+    vl_test_fn fn;
+} vl_test_case_t;
+
+static vl_test_case_t vl_test_cases[VL_TEST_CAPACITY];
+static size_t vl_test_count;
+static int vl_test_failures;
+
+void vl_test_fail(const char *file, int line, const char *expr)
+{
+    ++vl_test_failures;
+    fprintf(stderr, "%s:%d: assertion failed: %s\n", file, line, expr);
+}
+
+void vl_test_add(const char *name, vl_test_fn fn)
+{
+    if (vl_test_count >= VL_TEST_CAPACITY) {
+        vl_test_fail(__FILE__, __LINE__, "test registry capacity");
+        return;
+    }
+
+    vl_test_cases[vl_test_count].name = name;
+    vl_test_cases[vl_test_count].fn = fn;
+    ++vl_test_count;
+}
+
+int vl_test_run_all(void)
+{
+    size_t index;
+
+    for (index = 0; index < vl_test_count; ++index) {
+        int failures_before = vl_test_failures;
+
+        vl_test_cases[index].fn();
+        if (vl_test_failures == failures_before) {
+            printf("PASS %s\n", vl_test_cases[index].name);
+        } else {
+            printf("FAIL %s\n", vl_test_cases[index].name);
+        }
+    }
+
+    printf("%zu tests, %d failures\n", vl_test_count, vl_test_failures);
+    return vl_test_failures == 0 ? 0 : 1;
+}
+
+VL_TEST(common_status_codes_follow_sign_convention)
+{
+    VL_ASSERT(VL_OK == 0);
+    VL_ASSERT(VL_ERROR_INVALID_ARGUMENT < 0);
+    VL_ASSERT(VL_ERROR_OUT_OF_MEMORY < 0);
+}
+
+VL_TEST(common_version_is_available)
+{
+    VL_ASSERT(VL_VERSION_MAJOR == 0);
+    VL_ASSERT(VL_VERSION_MINOR == 1);
+    VL_ASSERT(VL_VERSION_PATCH == 0);
+}
+
+int main(void)
+{
+    vl_test_add("common_status_codes_follow_sign_convention",
+                common_status_codes_follow_sign_convention);
+    vl_test_add("common_version_is_available", common_version_is_available);
+    return vl_test_run_all();
+}

@@ -11,7 +11,7 @@
       "displayName": "Veloco development",
       "description": "Debug build for Linux x86_64 or arm64 with io_uring enabled; requires liburing",
       "generator": "Ninja",
-      "binaryDir": "${sourceDir}/build/dev",
+      "binaryDir": "${sourceDir}/build/$env{VELOCO_BUILD_PROCESSOR}/dev",
       "condition": {
         "type": "equals",
         "lhs": "${hostSystemName}",
@@ -29,7 +29,7 @@
       "displayName": "Veloco epoll fallback",
       "description": "RelWithDebInfo build for Linux x86_64 or arm64 with io_uring disabled and the epoll backend enabled",
       "generator": "Ninja",
-      "binaryDir": "${sourceDir}/build/epoll",
+      "binaryDir": "${sourceDir}/build/$env{VELOCO_BUILD_PROCESSOR}/epoll",
       "condition": {
         "type": "equals",
         "lhs": "${hostSystemName}",
@@ -47,7 +47,7 @@
       "displayName": "Veloco io_uring",
       "description": "RelWithDebInfo build for Linux x86_64 or arm64 with io_uring enabled; implies liburing development files",
       "generator": "Ninja",
-      "binaryDir": "${sourceDir}/build/uring",
+      "binaryDir": "${sourceDir}/build/$env{VELOCO_BUILD_PROCESSOR}/uring",
       "condition": {
         "type": "equals",
         "lhs": "${hostSystemName}",
@@ -65,7 +65,7 @@
       "displayName": "Veloco AddressSanitizer",
       "description": "Debug build for Linux x86_64 or arm64 with AddressSanitizer and warnings as errors",
       "generator": "Ninja",
-      "binaryDir": "${sourceDir}/build/asan",
+      "binaryDir": "${sourceDir}/build/$env{VELOCO_BUILD_PROCESSOR}/asan",
       "condition": {
         "type": "equals",
         "lhs": "${hostSystemName}",
@@ -84,7 +84,7 @@
       "displayName": "Veloco UndefinedBehaviorSanitizer",
       "description": "Debug build for Linux x86_64 or arm64 with UndefinedBehaviorSanitizer and warnings as errors",
       "generator": "Ninja",
-      "binaryDir": "${sourceDir}/build/ubsan",
+      "binaryDir": "${sourceDir}/build/$env{VELOCO_BUILD_PROCESSOR}/ubsan",
       "condition": {
         "type": "equals",
         "lhs": "${hostSystemName}",
@@ -103,7 +103,7 @@
       "displayName": "Veloco ThreadSanitizer",
       "description": "Debug build for Linux x86_64 or arm64 with ThreadSanitizer for supported tests; io_uring disabled",
       "generator": "Ninja",
-      "binaryDir": "${sourceDir}/build/tsan",
+      "binaryDir": "${sourceDir}/build/$env{VELOCO_BUILD_PROCESSOR}/tsan",
       "condition": {
         "type": "equals",
         "lhs": "${hostSystemName}",

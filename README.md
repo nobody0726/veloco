@@ -75,9 +75,12 @@ cmake --build --preset dev
 ctest --preset dev --output-on-failure
 ```
 
-Presets `dev`, `epoll`, `uring`, `asan`, `ubsan`, and `tsan` write their
-build trees under `build/<name>` and their logs under
-`build/artifacts/<name>`. The `uring` preset requires liburing.
+Presets `dev`, `epoll`, `uring`, `asan`, `ubsan`, and `tsan` write
+architecture-specific build trees such as `build/x86_64/dev` and
+`build/aarch64/dev`; logs go under `build/artifacts/<name>`. The
+`uring` preset requires liburing. `scripts/ci.sh` sets
+`VELOCO_BUILD_PROCESSOR` automatically; set it yourself when invoking
+raw `cmake --preset` commands directly.
 
 Task 0 deliberately does not create `CMakeLists.txt`; the configure,
 build, and CTest commands above become executable when Task 1 adds the
@@ -85,9 +88,10 @@ root `CMakeLists.txt`.
 
 ## Run
 
-The HTTP server binary is expected from Task 8. Once
-`build/uring/veloco-httpd` exists, a local smoke deployment runs from
-`deploy/compose.yaml`:
+The HTTP server binary is expected from Task 8. Once an architecture
+specific binary such as `build/x86_64/uring/veloco-httpd` or
+`build/aarch64/uring/veloco-httpd` exists, a local smoke deployment runs
+from `deploy/compose.yaml`:
 
 ```bash
 docker compose -f deploy/compose.yaml up --build
@@ -99,11 +103,11 @@ platform:
 
 ```bash
 docker build --platform linux/amd64 \
-  --build-arg VELOCO_HTTPD_BINARY=build/uring/veloco-httpd \
+  --build-arg VELOCO_HTTPD_BINARY=build/x86_64/uring/veloco-httpd \
   -f docker/runtime.Dockerfile -t veloco-httpd:local .
 
 docker build --platform linux/arm64 \
-  --build-arg VELOCO_HTTPD_BINARY=build/uring/veloco-httpd \
+  --build-arg VELOCO_HTTPD_BINARY=build/aarch64/uring/veloco-httpd \
   -f docker/runtime.Dockerfile -t veloco-httpd:arm64 .
 ```
 

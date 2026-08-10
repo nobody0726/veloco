@@ -20,6 +20,20 @@ esac
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${repo_root}"
 
+arch="$(uname -m 2>/dev/null || true)"
+case "${arch}" in
+  x86_64 | amd64)
+    export VELOCO_BUILD_PROCESSOR=x86_64
+    ;;
+  aarch64 | arm64)
+    export VELOCO_BUILD_PROCESSOR=aarch64
+    ;;
+  *)
+    echo "error: unsupported architecture '${arch:-unknown}'; expected x86_64 or arm64" >&2
+    exit 2
+    ;;
+esac
+
 artifact_dir="build/artifacts/${preset}"
 rm -rf "${artifact_dir}"
 mkdir -p "${artifact_dir}"
@@ -29,10 +43,13 @@ run_step() {
   local log="$2"
   shift 2
   echo "==> ${name}: $*"
-  if "$@" >"${log}" 2>&1; then
+  set +e
+  "$@" >"${log}" 2>&1
+  local status=$?
+  set -e
+  if [ "${status}" -eq 0 ]; then
     return 0
   fi
-  local status=$?
   echo "error: ${name} failed (exit ${status}); log: ${log}" >&2
   sed -n '1,200p' "${log}" >&2 || true
   exit "${status}"
@@ -40,18 +57,15 @@ run_step() {
 
 run_step configure "${artifact_dir}/configure.log" cmake --preset "${preset}"
 run_step build "${artifact_dir}/build.log" cmake --build --preset "${preset}" --parallel
+run_step test "${artifact_dir}/test.log" ctest --preset "${preset}" --output-on-failure
 
-if [ -f "build/${preset}/CTestTestfile.cmake" ]; then
-  run_step test "${artifact_dir}/test.log" ctest --preset "${preset}" --output-on-failure
-else
-  echo "note: build/${preset} has no CTestTestfile.cmake; ctest starts in Task 1" | tee "${artifact_dir}/test.log"
+cache_file="build/${VELOCO_BUILD_PROCESSOR}/${preset}/CMakeCache.txt"
+if [ -f "${cache_file}" ]; then
+  cp "${cache_file}" "${artifact_dir}/CMakeCache.txt"
 fi
-
-if [ -f "build/${preset}/CMakeCache.txt" ]; then
-  cp "build/${preset}/CMakeCache.txt" "${artifact_dir}/CMakeCache.txt"
-fi
-if [ -f "build/${preset}/Testing/Temporary/LastTest.log" ]; then
-  cp "build/${preset}/Testing/Temporary/LastTest.log" "${artifact_dir}/LastTest.log"
+last_test_log="build/${VELOCO_BUILD_PROCESSOR}/${preset}/Testing/Temporary/LastTest.log"
+if [ -f "${last_test_log}" ]; then
+  cp "${last_test_log}" "${artifact_dir}/LastTest.log"
 fi
 
 echo "ci complete for preset ${preset}; logs in ${artifact_dir}"

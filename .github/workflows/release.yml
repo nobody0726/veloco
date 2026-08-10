@@ -38,12 +38,12 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: veloco-httpd-${{ github.ref_name }}-linux-amd64
-          path: build/uring/veloco-httpd
+          path: build/x86_64/uring/veloco-httpd
           if-no-files-found: error
       - name: Build runtime image
         run: |
           docker build --platform linux/amd64 \
-            --build-arg VELOCO_HTTPD_BINARY=build/uring/veloco-httpd \
+            --build-arg VELOCO_HTTPD_BINARY=build/x86_64/uring/veloco-httpd \
             -f docker/runtime.Dockerfile \
             -t "$REGISTRY/$IMAGE_NAME:$GITHUB_REF_NAME-amd64" .
       - name: Log in to container registry
@@ -85,12 +85,12 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: veloco-httpd-${{ github.ref_name }}-linux-arm64
-          path: build/uring/veloco-httpd
+          path: build/aarch64/uring/veloco-httpd
           if-no-files-found: error
       - name: Build runtime image
         run: |
           docker build --platform linux/arm64 \
-            --build-arg VELOCO_HTTPD_BINARY=build/uring/veloco-httpd \
+            --build-arg VELOCO_HTTPD_BINARY=build/aarch64/uring/veloco-httpd \
             -f docker/runtime.Dockerfile \
             -t "$REGISTRY/$IMAGE_NAME:$GITHUB_REF_NAME-arm64" .
       - name: Log in to container registry

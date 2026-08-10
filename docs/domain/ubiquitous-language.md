@@ -30,6 +30,7 @@ here is a placeholder.
 | Cache | P-local fast path for allocation and free, refilled from and drained to the central free list. | Memory |
 | Central free list | Lock-protected layer of spans shared by all Ps. | Memory |
 | Backend | Abstraction over io_uring and epoll that exposes operations and completion results, not readiness types. | Async I/O |
+| Black-box Baseline | External behavior, smoke output, and benchmark data observed from `ef/` without copying or translating its implementation or tests. | Runtime |
 | SQE | Submission queue entry sent to the kernel. | Async I/O |
 | CQE | Completion queue entry returned by the kernel. | Async I/O |
 | Generation | Token attached to an I/O Request so a stale completion cannot wake a reused fd or Task. | Async I/O |
