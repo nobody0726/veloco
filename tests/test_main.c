@@ -4,6 +4,9 @@
 
 #include <stddef.h>
 #include <stdio.h>
+#include <string.h>
+
+void vl_register_fiber_tests(void);
 
 #define VL_TEST_CAPACITY 64
 
@@ -67,10 +70,19 @@ VL_TEST(common_version_is_available)
     VL_ASSERT(VL_VERSION_PATCH == 0);
 }
 
-int main(void)
+int main(int argc, char **argv)
 {
-    vl_test_add("common_status_codes_follow_sign_convention",
-                common_status_codes_follow_sign_convention);
-    vl_test_add("common_version_is_available", common_version_is_available);
+    const char *group = argc == 3 && strcmp(argv[1], "--group") == 0
+                            ? argv[2]
+                            : "all";
+
+    if (strcmp(group, "all") == 0 || strcmp(group, "common") == 0) {
+        vl_test_add("common_status_codes_follow_sign_convention",
+                    common_status_codes_follow_sign_convention);
+        vl_test_add("common_version_is_available", common_version_is_available);
+    }
+    if (strcmp(group, "all") == 0 || strcmp(group, "fiber") == 0) {
+        vl_register_fiber_tests();
+    }
     return vl_test_run_all();
 }

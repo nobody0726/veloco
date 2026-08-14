@@ -25,6 +25,8 @@ code, or tests are copied into Veloco.
 - `docs/superpowers/plans/2026-08-09-veloco-implementation-plan.md` -
   task-by-task implementation plan
 - `docs/domain/` - ubiquitous language and bounded contexts
+- `docs/architecture/` - implemented runtime contracts, ABI layouts,
+  ownership rules, and measured evidence
 - `docs/diagrams/` - system, Task lifecycle, I/O completion, and
   allocator diagrams
 - `docker/` - development and runtime container images
@@ -123,6 +125,8 @@ docker build --platform linux/arm64 \
 
 ## Current status
 
-Task 0 of the implementation plan is complete: domain model, build
-presets, containers, scripts, and CI. Source implementation starts in
-Task 1.
+Tasks 0-2 of the implementation plan are complete. The repository now
+contains the reproducible environment, CMake/test baseline, and independently
+implemented stackful fibers for Linux x86_64 and arm64 with guarded lazy
+stacks, sanitizer integration, ABI tests, diagrams, and a repeatable context
+switch benchmark. Task 3 adds the single-thread allocator.

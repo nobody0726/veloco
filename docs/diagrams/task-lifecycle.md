@@ -40,3 +40,25 @@ Wakeups never move a Task directly to RUNNING; they always go through
 execution. The I/O completion path is documented in
 [docs/diagrams/io-completion.md](io-completion.md). Implementation
 references: `include/veloco/task.h` and `src/runtime/task.c`.
+
+## Task-to-Fiber boundary
+
+Task state describes scheduler eligibility; Fiber state describes whether a
+saved CPU context can be entered. They are related but deliberately not the
+same state machine.
+
+```mermaid
+flowchart LR
+    Q["Task/G: RUNNABLE"] --> R["Task/G: RUNNING"]
+    R --> F["Fiber: RUNNING"]
+    F -->|"yield to runtime"| S["Fiber: SUSPENDED"]
+    S -->|"scheduler resumes task"| F
+    F -->|"function returns"| D["Fiber: DONE"]
+    D --> TD["Task/G: DONE"]
+    R -->|"park on I/O or timer"| W["Task/G: WAITING or SLEEPING"]
+```
+
+Task 2 implements only the Fiber side and its explicit scheduler handle. Task
+4 will own the Task/G transitions and map a parked Task to its suspended
+Fiber. A fiber yield alone does not choose a P, enqueue a Task, or represent an
+I/O wait.

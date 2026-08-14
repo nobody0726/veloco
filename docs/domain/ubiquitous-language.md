@@ -12,7 +12,7 @@ here is a placeholder.
 
 | Term | Definition | Owner | Implementation reference |
 | --- | --- | --- | --- |
-| Fiber | Stackful execution context with a reserved, lazily mapped, guarded stack; the unit of context switching. | Runtime | `include/veloco/fiber.h`, `src/fiber/fiber.c`, `src/fiber/fiber_x86_64.S`, `src/fiber/fiber_aarch64.S` (Task 2) |
+| Fiber | Thread-affine stackful execution context with READY/RUNNING/SUSPENDED/DONE state and a reserved, lazily mapped, guarded stack; the mechanism of context switching, not a scheduling policy. | Runtime | `include/veloco/fiber.h`, `src/fiber/fiber.c`, `src/fiber/fiber_x86_64.S`, `src/fiber/fiber_aarch64.S` (Task 2) |
 | Task/G | User-visible schedulable coroutine. A G owns a fiber, lifecycle state, parent context, cancellation/deadline state, and scheduling metadata. Task and G are synonyms in the runtime. | Runtime | `include/veloco/task.h`, `src/runtime/task.c`, `src/runtime/run_queue.c` |
 | P | Logical processor that owns a local runnable queue, allocator cache, timer queue, runtime counters, and remote-free queue. | Runtime, Memory | `src/runtime/worker.c`, `src/runtime/run_queue.c`, `src/memory/valloc.c` |
 | M | pthread worker that executes Tasks while holding a P; it may detach from a P for runtime-level waiting. | Runtime | `src/runtime/worker.c` |

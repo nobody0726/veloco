@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.22)
 project(
     Veloco
     VERSION 0.1.0
-    LANGUAGES C
+    LANGUAGES C ASM
 )
 
 include(CTest)
@@ -12,6 +12,16 @@ option(VELOCO_ENABLE_URING "Build the io_uring backend" ON)
 option(VELOCO_ENABLE_SANITIZERS "Enable ASan and UBSan" OFF)
 
 find_package(Threads REQUIRED)
+
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
+    set(VELOCO_FIBER_ASM src/fiber/fiber_x86_64.S)
+    set(VELOCO_FIBER_TEST_ASM tests/test_fiber_x86_64.S)
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64|ARM64)$")
+    set(VELOCO_FIBER_ASM src/fiber/fiber_aarch64.S)
+    set(VELOCO_FIBER_TEST_ASM tests/test_fiber_aarch64.S)
+else()
+    message(FATAL_ERROR "Unsupported fiber architecture: ${CMAKE_SYSTEM_PROCESSOR}")
+endif()
 
 add_library(veloco_build_options INTERFACE)
 target_compile_features(veloco_build_options INTERFACE c_std_11)
@@ -67,14 +77,28 @@ if(VELOCO_ENABLE_URING)
     endif()
 endif()
 
-add_executable(veloco_tests tests/test_main.c)
+add_library(
+    veloco
+    STATIC
+        src/fiber/fiber.c
+        ${VELOCO_FIBER_ASM}
+)
+target_include_directories(veloco PUBLIC "${PROJECT_SOURCE_DIR}/include")
+target_link_libraries(veloco PUBLIC veloco_build_options Threads::Threads)
+
+add_executable(
+    veloco_tests
+    tests/test_main.c
+    tests/test_fiber.c
+    ${VELOCO_FIBER_TEST_ASM}
+)
 target_include_directories(
     veloco_tests
     PRIVATE
         "${PROJECT_SOURCE_DIR}/include"
         "${PROJECT_SOURCE_DIR}/tests"
 )
-target_link_libraries(veloco_tests PRIVATE veloco_build_options Threads::Threads)
+target_link_libraries(veloco_tests PRIVATE veloco veloco_build_options Threads::Threads)
 
 if(VELOCO_ENABLE_URING)
     target_link_libraries(veloco_tests PRIVATE "${VELOCO_URING_TARGET}")
@@ -82,7 +106,8 @@ if(VELOCO_ENABLE_URING)
 endif()
 
 if(BUILD_TESTING)
-    add_test(NAME veloco.common COMMAND veloco_tests)
+    add_test(NAME veloco.common COMMAND veloco_tests --group common)
+    add_test(NAME veloco.fiber COMMAND veloco_tests --group fiber)
 endif()
 
 add_executable(veloco_bench_fiber benchmarks/bench_fiber.c)
@@ -91,4 +116,4 @@ target_include_directories(
     PRIVATE
         "${PROJECT_SOURCE_DIR}/include"
 )
-target_link_libraries(veloco_bench_fiber PRIVATE veloco_build_options)
+target_link_libraries(veloco_bench_fiber PRIVATE veloco veloco_build_options)

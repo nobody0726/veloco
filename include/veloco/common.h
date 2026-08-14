@@ -23,7 +23,8 @@ typedef enum vl_status {
     VL_ERROR_INVALID_ARGUMENT = -1,
     VL_ERROR_OUT_OF_MEMORY = -2,
     VL_ERROR_SYSTEM = -3,
-    VL_ERROR_UNSUPPORTED = -4
+    VL_ERROR_UNSUPPORTED = -4,
+    VL_ERROR_INVALID_STATE = -5
 } vl_status_t;
 
 #if defined(__GNUC__) || defined(__clang__)

@@ -10,6 +10,13 @@ typedef void (*vl_test_fn)(void);
             vl_test_fail(__FILE__, __LINE__, #expr);                           \
         }                                                                      \
     } while (0)
+#define VL_REQUIRE(expr)                                                       \
+    do {                                                                       \
+        if (!(expr)) {                                                         \
+            vl_test_fail(__FILE__, __LINE__, #expr);                           \
+            return;                                                            \
+        }                                                                      \
+    } while (0)
 
 void vl_test_fail(const char *file, int line, const char *expr);
 void vl_test_add(const char *name, vl_test_fn fn);

@@ -381,7 +381,7 @@ git commit -m "Establish a reproducible Veloco build and ef baseline"
 - Create: `tests/test_fiber.c`
 - Create: `docs/architecture/fiber.md`
 
-- [ ] **Step 1: Define the fiber API and state**
+- [x] **Step 1: Define the fiber API and state**
 
 Use an opaque fiber with an explicit scheduler:
 
@@ -402,7 +402,7 @@ void vl_fiber_destroy(vl_fiber_t *fiber);
 Document that all public calls are single-thread-affine until the
 multi-thread scheduler is added.
 
-- [ ] **Step 2: Write failing fiber tests**
+- [x] **Step 2: Write failing fiber tests**
 
 Add tests for two-way yield/resume, return value propagation, nested
 fiber execution, and a fiber that grows beyond its initially mapped
@@ -412,7 +412,7 @@ page. The test must assert the exact event order:
 main -> fiber-a -> fiber-b -> fiber-a -> main
 ```
 
-- [ ] **Step 3: Implement the architecture-specific context layouts**
+- [x] **Step 3: Implement the architecture-specific context layouts**
 
 Save and restore the System V x86_64 callee-saved registers, stack
 pointer, and return address in `src/fiber/fiber_x86_64.S`. Save and
@@ -423,14 +423,14 @@ its parent when the user function returns. `docs/architecture/fiber.md`
 must include stack alignment, register layout, and first-entry
 trampoline diagrams for both ABIs.
 
-- [ ] **Step 4: Implement guarded lazy stack mapping**
+- [x] **Step 4: Implement guarded lazy stack mapping**
 
 Reserve the full stack with `mmap(PROT_NONE)`, map the top usable page,
 keep one guard page, and expand lower pages with `mprotect` when the
 fault address is inside the reserved range. Reject addresses outside
 the reserved stack region.
 
-- [ ] **Step 5: Run fiber tests and sanitizer-compatible tests**
+- [x] **Step 5: Run fiber tests and sanitizer-compatible tests**
 
 Run:
 
@@ -446,12 +446,17 @@ Expected: all fiber tests pass. Stack growth must not change event order,
 and the invalid-fault test must terminate through the documented error
 path rather than silently corrupting memory.
 
-- [ ] **Step 6: Record the context-switch benchmark**
+Verification note: Docker arm64 and emulated amd64 epoll, ASan, and UBSan
+passed; Docker arm64 TSan passed. Docker Desktop's emulated amd64 TSan process
+failed before test startup with an unexpected-memory-mapping error, so it is
+not treated as a fiber failure. Native GitHub amd64 TSan remains the authority.
+
+- [x] **Step 6: Record the context-switch benchmark**
 
 Build `bench_fiber`, run one million yield/resume pairs, and record
 elapsed time and switches per second in `docs/architecture/fiber.md`.
 
-- [ ] **Step 7: Update the fiber domain and diagrams**
+- [x] **Step 7: Update the fiber domain and diagrams**
 
 Update `docs/architecture/fiber.md` with the final stack layout,
 register contract, ownership rules, and measured result. Update
