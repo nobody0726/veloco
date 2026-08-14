@@ -11,6 +11,16 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#if defined(__has_feature)
+#if __has_feature(address_sanitizer)
+#define VL_TEST_WITH_ASAN 1
+#endif
+#endif
+
+#if defined(__SANITIZE_ADDRESS__)
+#define VL_TEST_WITH_ASAN 1
+#endif
+
 typedef long (*vl_abi_callback_fn)(void *arg);
 
 extern long vl_test_callee_saved_registers(vl_abi_callback_fn callback,
@@ -246,6 +256,36 @@ static long write_to_unrelated_guard_page(void *arg)
     return 0;
 }
 
+static int fault_child_was_terminated(int status)
+{
+    if (WIFSIGNALED(status)) {
+        int signal_number = WTERMSIG(status);
+
+        if (signal_number == SIGSEGV) {
+            return 1;
+        }
+#if defined(VL_TEST_WITH_ASAN)
+        if (signal_number == SIGABRT) {
+            return 1;
+        }
+#endif
+    }
+
+    if (WIFEXITED(status)) {
+        int exit_code = WEXITSTATUS(status);
+
+        if (exit_code == 128 + SIGSEGV) {
+            return 1;
+        }
+#if defined(VL_TEST_WITH_ASAN)
+        if (exit_code == 1) {
+            return 1;
+        }
+#endif
+    }
+    return 0;
+}
+
 VL_TEST(unrelated_fault_is_not_consumed_by_stack_growth_handler)
 {
     pid_t child = fork();
@@ -275,8 +315,7 @@ VL_TEST(unrelated_fault_is_not_consumed_by_stack_growth_handler)
 
     if (child > 0) {
         VL_ASSERT(waitpid(child, &status, 0) == child);
-        VL_ASSERT((WIFSIGNALED(status) && WTERMSIG(status) == SIGSEGV) ||
-                  (WIFEXITED(status) && WEXITSTATUS(status) != 0));
+        VL_ASSERT(fault_child_was_terminated(status));
     }
 }
 
