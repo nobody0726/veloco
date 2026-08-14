@@ -15,10 +15,17 @@
 #if __has_feature(address_sanitizer)
 #define VL_TEST_WITH_ASAN 1
 #endif
+#if __has_feature(thread_sanitizer)
+#define VL_TEST_WITH_TSAN 1
+#endif
 #endif
 
 #if defined(__SANITIZE_ADDRESS__)
 #define VL_TEST_WITH_ASAN 1
+#endif
+
+#if defined(__SANITIZE_THREAD__)
+#define VL_TEST_WITH_TSAN 1
 #endif
 
 typedef long (*vl_abi_callback_fn)(void *arg);
@@ -279,6 +286,11 @@ static int fault_child_was_terminated(int status)
         }
 #if defined(VL_TEST_WITH_ASAN)
         if (exit_code == 1) {
+            return 1;
+        }
+#endif
+#if defined(VL_TEST_WITH_TSAN)
+        if (exit_code == 66) {
             return 1;
         }
 #endif
