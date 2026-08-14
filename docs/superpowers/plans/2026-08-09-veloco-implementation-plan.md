@@ -449,7 +449,8 @@ path rather than silently corrupting memory.
 Verification note: Docker arm64 and emulated amd64 epoll, ASan, and UBSan
 passed; Docker arm64 TSan passed. Docker Desktop's emulated amd64 TSan process
 failed before test startup with an unexpected-memory-mapping error, so it is
-not treated as a fiber failure. Native GitHub amd64 TSan remains the authority.
+not treated as a fiber failure. The full native GitHub amd64 matrix, including
+Clang TSan, passed in CI run 31811776734.
 
 - [x] **Step 6: Record the context-switch benchmark**
 

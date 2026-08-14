@@ -167,6 +167,10 @@ its fiber identity API, so logical fibers are not conflated on one pthread.
 The ABI test loads all supported non-volatile registers with known values,
 yields, resumes, and verifies every value after the switch.
 
+The native Linux amd64 CI matrix passed GCC epoll/io_uring, GCC ASan/UBSan,
+Clang epoll, and Clang TSan in
+[run 31811776734](https://github.com/nobody0726/veloco/actions/runs/31811776734).
+
 ## Benchmark
 
 `veloco_bench_fiber` performs a 10,000-pair warm-up followed by 1,000,000
