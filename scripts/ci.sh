@@ -9,10 +9,10 @@ if [ -z "${preset}" ]; then
   exit 2
 fi
 case "${preset}" in
-  dev | epoll | uring | asan | ubsan | tsan)
+  dev | epoll | uring | asan | ubsan | tsan | memory-debug)
     ;;
   *)
-    echo "error: unknown preset '${preset}'; expected one of: dev, epoll, uring, asan, ubsan, tsan" >&2
+    echo "error: unknown preset '${preset}'; expected one of: dev, epoll, uring, asan, ubsan, tsan, memory-debug" >&2
     exit 2
     ;;
 esac

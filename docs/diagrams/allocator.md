@@ -7,15 +7,20 @@ page ranges through `mmap`/`munmap`.
 
 ```mermaid
 flowchart LR
-    API["vl_malloc / vl_free"] --> LOCAL["P-local cache"]
+    API["vl_malloc / vl_free"] --> LOCAL["owner-thread cache (P-local later)"]
     LOCAL --> CENTRAL["Central free list"]
     CENTRAL --> SPAN["Span (one size class)"]
     SPAN --> PAGES["Page heap"]
     PAGES --> MMAP["mmap / munmap"]
+    API --> LARGE["large allocation"]
+    LARGE --> PAGES
+    ARENA["vl_arena_alloc"] --> ARENA_BLOCK["arena blocks"]
+    ARENA_BLOCK --> PAGES
+    POOL["vl_pool_alloc"] --> API
 ```
 
-The cache belongs to P, not M. When a Task frees an object on a
-different P than the one that owns the cache, the free is remote:
+The cache will belong to P, not M. Task 3 has one thread-affine cache; the
+multi-P remote-free path is a later runtime milestone. That future flow is:
 
 ```mermaid
 flowchart LR
@@ -24,6 +29,9 @@ flowchart LR
     SAFE --> LOCAL["Owning P local cache"]
     LOCAL --> CENTRAL["Central free list (batch drain)"]
 ```
+
+In Task 3, `cross_p_frees` remains zero because no P exists yet. The diagram
+is a domain boundary, not a claim that the multi-thread queue is implemented.
 
 Ownership and sizing rules:
 
@@ -45,7 +53,7 @@ Ownership and sizing rules:
 - Debug builds add canaries, poison patterns, metadata, and double-free
   detection. Allocation is explicit-free only; there is no GC.
 
-Implementation references: `include/veloco/memory.h`, `src/memory/size_class.c`,
-`src/memory/span.c`, `src/memory/page_heap.c`, `src/memory/valloc.c`,
-and `src/memory/arena.c` (Task 3). Remote-free support is implemented
-with the scheduler in Task 3 and Task 4 milestones.
+Implementation references: `include/veloco/memory.h`,
+`src/memory/size_class.c`, `src/memory/span.c`, `src/memory/page_heap.c`,
+`src/memory/valloc.c`, `src/memory/arena.c`, `src/memory/object_pool.c`, and
+`src/memory/debug_allocator.c` (Task 3).

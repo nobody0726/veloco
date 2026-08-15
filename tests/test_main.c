@@ -7,6 +7,7 @@
 #include <string.h>
 
 void vl_register_fiber_tests(void);
+void vl_register_memory_tests(void);
 
 #define VL_TEST_CAPACITY 64
 
@@ -83,6 +84,9 @@ int main(int argc, char **argv)
     }
     if (strcmp(group, "all") == 0 || strcmp(group, "fiber") == 0) {
         vl_register_fiber_tests();
+    }
+    if (strcmp(group, "all") == 0 || strcmp(group, "memory") == 0) {
+        vl_register_memory_tests();
     }
     return vl_test_run_all();
 }

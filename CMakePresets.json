@@ -116,6 +116,25 @@
         "VELOCO_ENABLE_URING": "OFF",
         "VELOCO_ENABLE_SANITIZERS": "ON"
       }
+    },
+    {
+      "name": "memory-debug",
+      "displayName": "Veloco allocator debug checks",
+      "description": "Debug build with allocator canaries, poison, and double-free detection; io_uring disabled",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/$env{VELOCO_BUILD_PROCESSOR}/memory-debug",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_C_FLAGS": "-Wall -Wextra -Werror",
+        "VELOCO_ENABLE_URING": "OFF",
+        "VELOCO_ENABLE_SANITIZERS": "OFF",
+        "VELOCO_MEMORY_DEBUG": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -142,6 +161,10 @@
     {
       "name": "tsan",
       "configurePreset": "tsan"
+    },
+    {
+      "name": "memory-debug",
+      "configurePreset": "memory-debug"
     }
   ],
   "testPresets": [
@@ -168,6 +191,10 @@
     {
       "name": "tsan",
       "configurePreset": "tsan"
+    },
+    {
+      "name": "memory-debug",
+      "configurePreset": "memory-debug"
     }
   ]
 }

@@ -67,6 +67,7 @@ cmake --list-presets
 ./scripts/ci.sh dev
 ./scripts/ci.sh uring
 ./scripts/ci.sh asan
+./scripts/ci.sh memory-debug
 ```
 
 Or run each step explicitly:
@@ -77,12 +78,16 @@ cmake --build --preset dev
 ctest --preset dev --output-on-failure
 ```
 
-Presets `dev`, `epoll`, `uring`, `asan`, `ubsan`, and `tsan` write
+Presets `dev`, `epoll`, `uring`, `asan`, `ubsan`, `tsan`, and `memory-debug` write
 architecture-specific build trees such as `build/x86_64/dev` and
 `build/aarch64/dev`; logs go under `build/artifacts/<name>`. The
 `uring` preset requires liburing. `scripts/ci.sh` sets
 `VELOCO_BUILD_PROCESSOR` automatically; set it yourself when invoking
 raw `cmake --preset` commands directly.
+
+`memory-debug` enables allocator prefix/suffix canaries, freed-memory poison,
+and double-free checks. Use `epoll` or `uring` for allocator benchmarks so
+those checks do not alter the measured hot path.
 
 Task 0 deliberately does not create `CMakeLists.txt`; the configure,
 build, and CTest commands above become executable when Task 1 adds the
@@ -125,8 +130,9 @@ docker build --platform linux/arm64 \
 
 ## Current status
 
-Tasks 0-2 of the implementation plan are complete. The repository now
+Tasks 0-3 of the implementation plan are complete. The repository now
 contains the reproducible environment, CMake/test baseline, and independently
 implemented stackful fibers for Linux x86_64 and arm64 with guarded lazy
-stacks, sanitizer integration, ABI tests, diagrams, and a repeatable context
-switch benchmark. Task 3 adds the single-thread allocator.
+stacks, sanitizer integration, ABI tests, a single-thread size-class allocator,
+arenas, fixed-object pools, diagrams, and repeatable context-switch/allocation
+benchmarks. Task 4 adds the single-thread Task runtime.

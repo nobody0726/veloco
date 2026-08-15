@@ -10,6 +10,7 @@ include(CTest)
 
 option(VELOCO_ENABLE_URING "Build the io_uring backend" ON)
 option(VELOCO_ENABLE_SANITIZERS "Enable ASan and UBSan" OFF)
+option(VELOCO_MEMORY_DEBUG "Enable allocator canaries, poison, and double-free checks" OFF)
 
 find_package(Threads REQUIRED)
 
@@ -82,20 +83,36 @@ add_library(
     STATIC
         src/fiber/fiber.c
         ${VELOCO_FIBER_ASM}
+        src/memory/arena.c
+        src/memory/debug_allocator.c
+        src/memory/object_pool.c
+        src/memory/page_heap.c
+        src/memory/size_class.c
+        src/memory/span.c
+        src/memory/valloc.c
 )
-target_include_directories(veloco PUBLIC "${PROJECT_SOURCE_DIR}/include")
+target_include_directories(
+    veloco
+    PUBLIC "${PROJECT_SOURCE_DIR}/include"
+    PRIVATE "${PROJECT_SOURCE_DIR}/src/memory"
+)
 target_link_libraries(veloco PUBLIC veloco_build_options Threads::Threads)
+if(VELOCO_MEMORY_DEBUG)
+    target_compile_definitions(veloco PUBLIC VELOCO_MEMORY_DEBUG=1)
+endif()
 
 add_executable(
     veloco_tests
     tests/test_main.c
     tests/test_fiber.c
+    tests/test_memory.c
     ${VELOCO_FIBER_TEST_ASM}
 )
 target_include_directories(
     veloco_tests
     PRIVATE
         "${PROJECT_SOURCE_DIR}/include"
+        "${PROJECT_SOURCE_DIR}/src/memory"
         "${PROJECT_SOURCE_DIR}/tests"
 )
 target_link_libraries(veloco_tests PRIVATE veloco veloco_build_options Threads::Threads)
@@ -108,6 +125,7 @@ endif()
 if(BUILD_TESTING)
     add_test(NAME veloco.common COMMAND veloco_tests --group common)
     add_test(NAME veloco.fiber COMMAND veloco_tests --group fiber)
+    add_test(NAME veloco.memory COMMAND veloco_tests --group memory)
 endif()
 
 add_executable(veloco_bench_fiber benchmarks/bench_fiber.c)
@@ -117,3 +135,7 @@ target_include_directories(
         "${PROJECT_SOURCE_DIR}/include"
 )
 target_link_libraries(veloco_bench_fiber PRIVATE veloco veloco_build_options)
+
+add_executable(bench_alloc benchmarks/bench_alloc.c)
+target_include_directories(bench_alloc PRIVATE "${PROJECT_SOURCE_DIR}/include")
+target_link_libraries(bench_alloc PRIVATE veloco veloco_build_options)

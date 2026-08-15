@@ -66,6 +66,13 @@ jobs:
             cc: clang
             cxx: clang++
             install_liburing: false
+          - name: linux/amd64 gcc allocator debug
+            artifact: linux-amd64-gcc-memory-debug
+            preset: memory-debug
+            bootstrap: epoll
+            cc: gcc
+            cxx: g++
+            install_liburing: false
     steps:
       - name: Checkout
         uses: actions/checkout@v4

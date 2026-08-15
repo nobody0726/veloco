@@ -479,7 +479,7 @@ The Task lifecycle diagram must show the exact fiber-to-Task boundary.
 - Create: `benchmarks/bench_alloc.c`
 - Create: `docs/architecture/allocator.md`
 
-- [ ] **Step 1: Define allocator APIs and statistics**
+- [x] **Step 1: Define allocator APIs and statistics**
 
 Use explicit ownership APIs:
 
@@ -503,46 +503,46 @@ void vl_allocator_shutdown(void);
 void vl_allocator_get_stats(vl_allocator_stats_t *out);
 ```
 
-- [ ] **Step 2: Write failing size-class and alignment tests**
+- [x] **Step 2: Write failing size-class and alignment tests**
 
 Test sizes from 1 byte through the largest small-object threshold,
 assert that returned pointers are suitably aligned, and verify that
 `vl_free(NULL)` is harmless.
 
-- [ ] **Step 3: Implement fixed size classes**
+- [x] **Step 3: Implement fixed size classes**
 
 Store a sorted table of classes and round requests to the first class
 that fits. Return a distinct large-allocation path above the configured
 small-object threshold.
 
-- [ ] **Step 4: Write failing span and page-heap tests**
+- [x] **Step 4: Write failing span and page-heap tests**
 
 Allocate a span, split it into same-class objects, free every object,
 and assert that the span reports zero active objects. Allocate and
 release a large mapping and assert that mapped-byte statistics return to
 the prior value.
 
-- [ ] **Step 5: Implement page heap and spans**
+- [x] **Step 5: Implement page heap and spans**
 
 Use page-aligned `mmap` for page acquisition. Store span metadata outside
 the user object area, maintain a free-object intrusive list, and keep
 the size class in the span header so `vl_free` does not need a global
 size lookup.
 
-- [ ] **Step 6: Add arena and fixed-object pool tests**
+- [x] **Step 6: Add arena and fixed-object pool tests**
 
 Verify that arena reset releases all blocks at once and that a pool
 reuses objects without changing its object size. Add a test that an
 arena cannot be used after reset in debug mode.
 
-- [ ] **Step 7: Add debug checks**
+- [x] **Step 7: Add debug checks**
 
 In debug builds, put a canary before and after the user payload, poison
 freed memory, and detect double free through an object state marker.
 Keep the checks behind `VELOCO_MEMORY_DEBUG` so the benchmark path is
 not forced to pay for them.
 
-- [ ] **Step 8: Run allocator tests and benchmark against libc**
+- [x] **Step 8: Run allocator tests and benchmark against libc**
 
 Run:
 
@@ -557,12 +557,21 @@ Expected: no invalid access, all size classes pass, and the benchmark
 prints allocation rate, active bytes, cache hits, refills, and mapped
 bytes.
 
-- [ ] **Step 9: Update allocator model and diagrams**
+- [x] **Step 9: Update allocator model and diagrams**
 
 Update `docs/architecture/allocator.md` with the actual size-class table,
 span metadata, debug ownership rules, and benchmark result. Update
 `docs/diagrams/allocator.md` so its arrows match the implemented refill,
 drain, arena, and large-object paths.
+
+Completion evidence (2026-08-15): allocator tests pass in Docker on arm64 and
+amd64 with the `epoll`, `memory-debug`, ASan, and UBSan presets, and on arm64
+with TSan. Clang static analysis reports no allocator findings, and Valgrind
+reports zero errors and zero bytes in use after the memory test group. Docker
+Desktop's emulated amd64 TSan process cannot start because its shadow-memory
+mapping conflicts with the VM address layout; native amd64 TSan remains part
+of GitHub CI. Serial single-thread benchmark results and their container-only
+limitations are recorded in `docs/architecture/allocator.md`.
 
 ## Task 4: Add the Single-Thread Task Runtime
 
