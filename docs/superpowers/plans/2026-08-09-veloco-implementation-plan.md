@@ -872,7 +872,7 @@ allocation/free, and the existing allocator suite pass in Linux arm64 epoll
 and TSan builds. The central allocator mutex protects span and statistics
 state; object headers record owner P.
 
-- [ ] **Step 7: Run multi-thread stress tests**
+- [x] **Step 7: Run multi-thread stress tests**
 
 ```bash
 cmake --build build-uring --parallel
@@ -882,12 +882,21 @@ ctest --test-dir build-uring -R 'queue|task|memory|sync|timer' --output-on-failu
 Expected: no lost wakeups, duplicate Task execution, allocator corruption,
 or timer double-fire across a long stress run.
 
-- [ ] **Step 8: Update scheduler and synchronization diagrams**
+Evidence (2026-08-23): arm64 GCC dev, epoll, uring, memory-debug, ASan,
+UBSan, and TSan builds pass their registered suites. Clang arm64 epoll also
+passes. The Docker kernel skips the io_uring runtime test; native CI remains
+the authoritative io_uring execution gate.
+
+- [x] **Step 8: Update scheduler and synchronization diagrams**
 
 Update `docs/architecture/scheduler.md` with the final G/P/M ownership
 rules, atomic memory orders, eventfd wake path, and measured stealing
 statistics. Add mutex, channel, semaphore, and timer wait paths to
 `docs/diagrams/task-lifecycle.md`.
+
+Evidence (2026-08-23): scheduler, synchronization, timer, and allocator
+architecture documents plus domain vocabulary and Mermaid lifecycle diagrams
+were updated with implemented ownership and wake protocols.
 
 ## Task 8: Integrate HTTP/1.1
 
