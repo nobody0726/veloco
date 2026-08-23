@@ -46,14 +46,25 @@ jobs:
             --build-arg VELOCO_HTTPD_BINARY=build/x86_64/uring/veloco-httpd \
             -f docker/runtime.Dockerfile \
             -t "$REGISTRY/$IMAGE_NAME:$GITHUB_REF_NAME-amd64" .
+      - name: Check registry credentials
+        id: registry
+        env:
+          REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+        run: |
+          if [ -n "$REGISTRY_USERNAME" ] && [ -n "$REGISTRY_PASSWORD" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
       - name: Log in to container registry
-        if: secrets.REGISTRY_USERNAME != '' && secrets.REGISTRY_PASSWORD != ''
+        if: steps.registry.outputs.enabled == 'true'
         env:
           REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
           REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
         run: echo "$REGISTRY_PASSWORD" | docker login "$REGISTRY" --username "$REGISTRY_USERNAME" --password-stdin
       - name: Publish image
-        if: secrets.REGISTRY_USERNAME != '' && secrets.REGISTRY_PASSWORD != ''
+        if: steps.registry.outputs.enabled == 'true'
         run: docker push "$REGISTRY/$IMAGE_NAME:$GITHUB_REF_NAME-amd64"
       - name: Upload build logs
         if: always()
@@ -93,14 +104,25 @@ jobs:
             --build-arg VELOCO_HTTPD_BINARY=build/aarch64/uring/veloco-httpd \
             -f docker/runtime.Dockerfile \
             -t "$REGISTRY/$IMAGE_NAME:$GITHUB_REF_NAME-arm64" .
+      - name: Check registry credentials
+        id: registry
+        env:
+          REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+        run: |
+          if [ -n "$REGISTRY_USERNAME" ] && [ -n "$REGISTRY_PASSWORD" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
       - name: Log in to container registry
-        if: secrets.REGISTRY_USERNAME != '' && secrets.REGISTRY_PASSWORD != ''
+        if: steps.registry.outputs.enabled == 'true'
         env:
           REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
           REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
         run: echo "$REGISTRY_PASSWORD" | docker login "$REGISTRY" --username "$REGISTRY_USERNAME" --password-stdin
       - name: Publish image
-        if: secrets.REGISTRY_USERNAME != '' && secrets.REGISTRY_PASSWORD != ''
+        if: steps.registry.outputs.enabled == 'true'
         run: docker push "$REGISTRY/$IMAGE_NAME:$GITHUB_REF_NAME-arm64"
       - name: Upload build logs
         if: always()

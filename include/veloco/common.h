@@ -24,7 +24,8 @@ typedef enum vl_status {
     VL_ERROR_OUT_OF_MEMORY = -2,
     VL_ERROR_SYSTEM = -3,
     VL_ERROR_UNSUPPORTED = -4,
-    VL_ERROR_INVALID_STATE = -5
+    VL_ERROR_INVALID_STATE = -5,
+    VL_ERROR_WOULD_BLOCK = -6
 } vl_status_t;
 
 #if defined(__GNUC__) || defined(__clang__)

@@ -19,6 +19,7 @@ typedef enum vl_task_state {
 typedef void (*vl_task_fn)(void *arg);
 
 VL_API vl_task_t *vl_spawn(vl_runtime_t *runtime, vl_task_fn fn, void *arg);
+VL_API vl_task_t *vl_task_current(void);
 VL_API void vl_yield(void);
 VL_API int vl_join(vl_task_t *task);
 VL_API vl_task_state_t vl_task_state(const vl_task_t *task);

@@ -661,7 +661,7 @@ for `spawn -> run -> yield -> resume -> done`.
 - Create: `src/net/socket.c`
 - Create: `tests/test_io.c`
 
-- [ ] **Step 1: Define operation and completion types**
+- [x] **Step 1: Define operation and completion types**
 
 ```c
 typedef enum {
@@ -682,21 +682,22 @@ typedef struct {
     vl_task_t *task;
 } vl_io_request_t;
 
-int vl_io_submit(vl_io_request_t *req);
-int vl_io_cancel(vl_io_request_t *req);
+int vl_io_submit(vl_io_t *io, vl_io_request_t *req);
+int vl_io_cancel(vl_io_t *io, vl_io_request_t *req);
+int vl_io_poll(vl_io_t *io, int timeout_ms, vl_io_completion_t *completion);
 ```
 
-- [ ] **Step 2: Write loopback socket tests**
+- [x] **Step 2: Write loopback socket tests**
 
 Create a nonblocking local listener and client. Verify partial send,
 partial receive, EOF, close-before-wakeup, and fd generation changes.
 
-- [ ] **Step 3: Implement epoll readiness adaptation**
+- [x] **Step 3: Implement epoll readiness adaptation**
 
 Store one waiter per fd and translate readable/writable readiness into
 Task wakeups. Keep the adapter private to `src/net/epoll_backend.c`.
 
-- [ ] **Step 4: Run I/O tests with epoll**
+- [x] **Step 4: Run I/O tests with epoll**
 
 ```bash
 cmake -S . -B build-epoll -DVELOCO_ENABLE_URING=OFF
@@ -706,12 +707,24 @@ ctest --test-dir build-epoll -R io --output-on-failure
 
 Expected: the same public I/O tests pass without exposing epoll types.
 
-- [ ] **Step 5: Update the I/O context documentation**
+- [x] **Step 5: Update the I/O context documentation**
 
 Update `docs/architecture/io.md` to describe the readiness adapter and
 the backend-neutral request ownership model. Add the epoll path to
 `docs/diagrams/io-completion.md` as a comparison path; do not alter the
 io_uring primary decision.
+
+Completion evidence (2026-08-23): arm64 Docker builds and all six CTest
+groups pass with `epoll`, `dev`, `uring`, ASan, UBSan, allocator-debug, and
+TSan presets; a separate Clang 18 epoll build also passes all groups with
+warnings treated as errors. I/O tests cover nonblocking loopback
+connect/accept, forced
+partial receive and send, EOF, cancellation completion, close plus exact fd
+reuse, stale-generation rejection, one process-wide waiter per fd, untracked
+fd rejection, and I/O handle thread affinity. Task 5 preserves Task identity
+in completions, parks Task-bound requests, drives epoll at single-thread
+scheduler boundaries, and verifies both completion and cancellation wakeups.
+Dedicated I/O workers and cross-thread P wakeups remain Task 6/7 work.
 
 ## Task 6: Implement the First io_uring Backend
 

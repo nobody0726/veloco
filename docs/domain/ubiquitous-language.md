@@ -16,7 +16,7 @@ here is a placeholder.
 | Task/G | User-visible schedulable coroutine. In Task 4, a G owns a Fiber, lifecycle state, function/argument, FIFO membership, and join waiters. Parent context, cancellation/deadline state, and migration metadata are later extensions. Task and G are synonyms in the runtime. | Runtime | `include/veloco/task.h`, `src/runtime/task.c`, `src/runtime/scheduler.c` (Task 4) |
 | P | Future logical processor that owns a local runnable queue, allocator cache, timer queue, runtime counters, and remote-free queue. Task 4 has one Runtime queue and no P objects yet. | Runtime, Memory | `src/runtime/worker.c`, `src/runtime/run_queue.c`, `src/memory/valloc.c` (future) |
 | M | Future pthread worker that executes Tasks while holding a P; Task 4 uses only the Runtime owner thread. | Runtime | `src/runtime/worker.c` (future) |
-| I/O Request | Operation (accept, recv, send, connect, timeout, or cancel) whose kernel completion wakes a Task. | Async I/O | `include/veloco/io.h`, `src/net/backend.c`, `src/net/uring_backend.c` (Tasks 5-6) |
+| I/O Request | Caller-owned operation descriptor containing op, fd, buffer, generation, and Task identity. The backend borrows it until exactly one Completion is consumed. | Async I/O | `include/veloco/io.h`, `src/net/backend.c`, `src/net/epoll_backend.c` (Task 5) |
 | Span | Page range divided into objects of one size class, with central/cache free lists, active/free counters, and debug metadata. | Memory | `src/memory/span.c` (Task 3) |
 | Arena | Request-lifetime allocation region whose mmap-backed blocks are released as a unit when reset or when the owning HTTP request completes. | Memory, HTTP | `src/memory/arena.c` (Task 3) |
 | Connection | HTTP socket, parser state, request arena, and the connection Task that owns them. | HTTP | `include/veloco/http.h`, `src/http/http_connection.c` (Task 8) |
@@ -34,6 +34,7 @@ here is a placeholder.
 | SQE | Submission queue entry sent to the kernel. | Async I/O |
 | CQE | Completion queue entry returned by the kernel. | Async I/O |
 | Generation | Token attached to an I/O Request so a stale completion cannot wake a reused fd or Task. | Async I/O |
+| I/O Completion | Backend-neutral result preserving the exact Request, Task identity, and fd generation; epoll produces it after one operation following readiness, then Runtime wakes a Task-bound request. | Async I/O |
 | Parser | Incremental HTTP/1.1 request-line and header parser with size limits. | HTTP |
 | Router | Maps request method and path to handlers. | HTTP |
 | Response | HTTP/1.1 response with status, headers, and body encoding (Content-Length or chunked). | HTTP |

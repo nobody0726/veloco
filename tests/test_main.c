@@ -10,6 +10,7 @@ void vl_register_fiber_tests(void);
 void vl_register_memory_tests(void);
 void vl_register_task_tests(void);
 void vl_register_queue_tests(void);
+void vl_register_io_tests(void);
 
 #define VL_TEST_CAPACITY 64
 
@@ -64,6 +65,7 @@ VL_TEST(common_status_codes_follow_sign_convention)
     VL_ASSERT(VL_OK == 0);
     VL_ASSERT(VL_ERROR_INVALID_ARGUMENT < 0);
     VL_ASSERT(VL_ERROR_OUT_OF_MEMORY < 0);
+    VL_ASSERT(VL_ERROR_WOULD_BLOCK < 0);
 }
 
 VL_TEST(common_version_is_available)
@@ -95,6 +97,9 @@ int main(int argc, char **argv)
     }
     if (strcmp(group, "all") == 0 || strcmp(group, "queue") == 0) {
         vl_register_queue_tests();
+    }
+    if (strcmp(group, "all") == 0 || strcmp(group, "io") == 0) {
+        vl_register_io_tests();
     }
     return vl_test_run_all();
 }

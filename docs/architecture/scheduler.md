@@ -70,8 +70,10 @@ down the Fiber scheduler and allocator.
 ## Scheduler loop
 
 ```text
-while runnable queue is not empty:
+while runnable Tasks or I/O waits remain:
+    poll attached I/O without blocking
     task = pop FIFO
+    if no task and I/O waits remain: block in I/O poll
     if shutdown requested: mark task CANCELLED
     else:
         task = RUNNING
@@ -80,10 +82,16 @@ while runnable queue is not empty:
         if Fiber is suspended: keep state chosen by yield/join
 ```
 
-The loop returns `VL_ERROR_INVALID_STATE` if it runs out of runnable Tasks
-while a non-terminal Task remains. This is a deterministic cooperative
-deadlock signal. Future I/O, timer, and synchronization contexts will wake
-such Tasks by placing them back on the same queue.
+Task 5 extends the loop with one attached I/O handle while Tasks are waiting.
+A completion changes its Task from WAITING to RUNNABLE and appends it to this
+same queue. Running out of both runnable Tasks and I/O waits while another
+non-terminal Task remains is still a deterministic cooperative deadlock
+signal. Timer and synchronization contexts remain future wakeup sources.
+
+If shutdown cancels a Task while its Request remains pending, backend
+ownership must be torn down before Runtime shutdown can reclaim the suspended
+Fiber. This ordering prevents a later completion from retaining a dangling
+Task pointer.
 
 ## Deliberate next boundary
 

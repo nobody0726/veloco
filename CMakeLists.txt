@@ -85,6 +85,9 @@ add_library(
         ${VELOCO_FIBER_ASM}
         src/runtime/task.c
         src/runtime/scheduler.c
+        src/net/backend.c
+        src/net/epoll_backend.c
+        src/net/socket.c
         src/memory/arena.c
         src/memory/debug_allocator.c
         src/memory/object_pool.c
@@ -110,6 +113,7 @@ add_executable(
     tests/test_memory.c
     tests/test_task.c
     tests/test_queue.c
+    tests/test_io.c
     ${VELOCO_FIBER_TEST_ASM}
 )
 target_include_directories(
@@ -132,6 +136,7 @@ if(BUILD_TESTING)
     add_test(NAME veloco.memory COMMAND veloco_tests --group memory)
     add_test(NAME veloco.task COMMAND veloco_tests --group task)
     add_test(NAME veloco.queue COMMAND veloco_tests --group queue)
+    add_test(NAME veloco.io COMMAND veloco_tests --group io)
 endif()
 
 add_executable(veloco_bench_fiber benchmarks/bench_fiber.c)
