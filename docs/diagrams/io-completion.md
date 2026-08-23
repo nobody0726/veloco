@@ -1,103 +1,120 @@
 # I/O Completion
 
-The target primary path submits one operation per I/O Request, parks the
-owning Task, and reaps the kernel completion. A Generation token and a
-Task-state check prevent a stale CQE from waking a reused fd or Task.
-Task 6 will implement a single io_uring ring with one dedicated I/O worker.
-Task 5 first establishes the same completion contract through an epoll
-baseline and integrates it with the single-thread Runtime. Host requests can
-also drive polling directly by leaving their Task pointer null.
+Both backends preserve the exact Request, Task identity, and fd generation.
+The Runtime owns Task state; a backend only publishes a Completion for the
+owner thread to consume.
+
+## io_uring submit and completion
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant G as Task/G
-    participant R as Runtime
-    participant B as Backend (io_uring)
-    participant K as Linux kernel
+    participant G as Task/G or host
+    participant O as I/O owner thread
+    participant Q as Synchronized queues
+    participant W as Ring Worker
+    participant K as Linux io_uring
 
-    G->>R: vl_io_submit(request, op, fd, buffer, generation)
-    R->>B: enqueue SQE
-    B->>K: io_uring_submit / SQE
-    K-->>B: operation completion
-    B-->>R: reap CQE
-    R->>R: validate generation and Task state
-    R-->>G: store result, mark RUNNABLE
-    G->>G: resume with completion result
+    G->>O: vl_io_submit(Request, generation, Task)
+    O->>O: validate request and claim fd generation
+    O->>Q: append SUBMIT(operation identity)
+    O->>W: eventfd write
+    opt Task-bound request
+        O-->>G: park Task in WAITING
+    end
+    W->>K: eventfd POLL_ADD CQE
+    W->>Q: drain commands
+    W->>K: prepare SQE(user_data = operation) and submit batch
+    K-->>W: original operation CQE(res, user_data)
+    W->>W: track accepted fd and release fd claim
+    W->>Q: publish Completion(Request, res, generation, Task)
+    Q-->>O: condvar signal / vl_io_poll
+    O->>O: validate current fd generation
+    alt generation changed
+        O->>O: result = -ESTALE
+    end
+    opt Task-bound completion
+        O->>O: WAITING -> RUNNABLE and enqueue
+        O-->>G: resume; submit returns
+    end
 ```
 
-Cancellation is cooperative and buffer-safe: the runtime submits a
-cancel SQE and only releases the request and buffer after the matching
-completion has been discarded or matched.
+The Request buffer, connect address, and metadata remain caller-owned and
+valid until the original CQE has produced a consumed Completion or the I/O
+handle is destroyed.
+
+## io_uring cancellation race
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant G as Task/G
-    participant R as Runtime
-    participant B as Backend (io_uring)
-    participant K as Linux kernel
+    participant O as I/O owner thread
+    participant Q as Command queue
+    participant W as Ring Worker
+    participant K as Linux io_uring
+    participant D as Completion queue
 
-    G->>R: vl_io_cancel(request)
-    R->>B: enqueue cancel SQE
-    B->>K: IORING_OP_ASYNC_CANCEL
-    K-->>B: cancel completion
-    B-->>R: reap cancel CQE
-    R->>R: confirm cancellation, release request/buffer
-    R-->>G: wake Task with cancelled result
+    O->>Q: append CANCEL(original operation identity)
+    O->>W: eventfd write
+    W->>K: IORING_OP_ASYNC_CANCEL(target user_data)
+    par Internal cancellation CQE
+        K-->>W: cancel CQE
+        W->>W: consume internally, never wake Task
+    and Original operation CQE
+        K-->>W: original CQE(real result or -ECANCELED)
+        W->>D: publish exactly one user Completion
+    end
+    D-->>O: consume Completion and wake Task at most once
 ```
 
-Invariants carried by these paths:
+If the operation wins, its real result is preserved and the cancel CQE may
+report that no target remained. If cancellation wins, the original CQE is
+`-ECANCELED`. The internal operation object stays alive until command,
+original CQE, and Completion ownership are all resolved.
 
-1. The request and its buffer stay valid until completion or confirmed
-   cancellation.
-2. A completion is dropped only when it belongs to a confirmed
-   cancellation; otherwise it must be matched to its Task.
-3. Wakeup always transitions `WAITING -> RUNNABLE`, never directly to
-   `RUNNING`.
-
-Implementation references: `include/veloco/io.h`, `src/net/backend.c`,
-`src/net/epoll_backend.c`, and `src/net/uring_backend.c` (Tasks 5-6).
-The epoll fallback implements the same Backend contract with readiness
-events instead of SQE/CQE.
-
-## Task 5 epoll path
+## Epoll comparison path
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant G as Task/G
-    participant R as Runtime
-    participant B as Backend interface
-    participant E as epoll adapter
+    participant G as Task/G or host
+    participant O as I/O owner thread
+    participant E as Epoll adapter
     participant K as Linux socket API
 
-    G->>B: submit(Request, Task, fd generation)
-    B->>E: register one waiter for fd
-    E->>K: epoll_ctl(ADD, readiness)
-    B-->>R: park Task WAITING
-    R->>B: poll(timeout at scheduler boundary)
-    B->>E: epoll_wait
+    G->>O: submit(Request, Task, fd generation)
+    O->>E: epoll_ctl ADD one waiter for fd
+    opt Task-bound request
+        O-->>G: park Task in WAITING
+    end
+    O->>E: epoll_wait at scheduler boundary
     K-->>E: readable / writable / hangup / error
     E->>E: validate current fd generation
     E->>K: one accept / recv / send / SO_ERROR
     K-->>E: operation result
-    E-->>B: Completion(request, result, generation, Task)
-    B->>R: WAITING -> RUNNABLE, enqueue
-    R-->>G: resume; submit returns
+    E-->>O: Completion(Request, result, generation, Task)
+    opt Task-bound completion
+        O->>O: WAITING -> RUNNABLE and enqueue
+        O-->>G: resume; submit returns
+    end
 ```
 
-Readiness is not itself completion. The adapter executes one nonblocking
-operation after readiness and returns that operation result. If it still
-observes `EAGAIN`, the waiter remains registered. Raw epoll event bits are
-translated to `VL_IO_EVENT_*` before crossing the Backend boundary.
+Readiness is not completion. If the nonblocking operation still returns
+`EAGAIN`, the waiter remains registered. Raw epoll flags never cross the
+backend boundary.
 
-Close-before-wakeup follows a separate stale path:
+## Stale generation flow
 
 ```mermaid
 flowchart LR
-    PENDING["Request pending at generation N"] --> CLOSE["vl_socket_close"]
-    CLOSE --> ADVANCE["fd generation N + 1"]
-    ADVANCE --> POLL["poll scans pending waiters"]
-    POLL --> STALE["Completion result = -ESTALE"]
+    PENDING["Request pending at fd generation N"] --> CLOSE["vl_socket_close(fd)"]
+    CLOSE --> ADVANCE["Registry marks inactive and advances generation"]
+    ADVANCE --> KERNEL["Kernel readiness or CQE arrives"]
+    KERNEL --> CHECK["Owner validates Request generation"]
+    CHECK --> STALE["Completion result = -ESTALE"]
+    STALE --> WAKE["Task wakes once with stale result"]
 ```
+
+Implementation references: `include/veloco/io.h`, `src/net/backend.c`,
+`src/net/epoll_backend.c`, `src/net/uring_backend.c`, and
+`src/net/io_worker.c`.

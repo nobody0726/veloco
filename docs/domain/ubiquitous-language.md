@@ -16,7 +16,7 @@ here is a placeholder.
 | Task/G | User-visible schedulable coroutine. In Task 4, a G owns a Fiber, lifecycle state, function/argument, FIFO membership, and join waiters. Parent context, cancellation/deadline state, and migration metadata are later extensions. Task and G are synonyms in the runtime. | Runtime | `include/veloco/task.h`, `src/runtime/task.c`, `src/runtime/scheduler.c` (Task 4) |
 | P | Future logical processor that owns a local runnable queue, allocator cache, timer queue, runtime counters, and remote-free queue. Task 4 has one Runtime queue and no P objects yet. | Runtime, Memory | `src/runtime/worker.c`, `src/runtime/run_queue.c`, `src/memory/valloc.c` (future) |
 | M | Future pthread worker that executes Tasks while holding a P; Task 4 uses only the Runtime owner thread. | Runtime | `src/runtime/worker.c` (future) |
-| I/O Request | Caller-owned operation descriptor containing op, fd, buffer, generation, and Task identity. The backend borrows it until exactly one Completion is consumed. | Async I/O | `include/veloco/io.h`, `src/net/backend.c`, `src/net/epoll_backend.c` (Task 5) |
+| I/O Request | Caller-owned operation descriptor containing op, fd, buffer/address/timeout data, generation, and Task identity. The selected backend borrows it until exactly one Completion is consumed or its handle is destroyed. | Async I/O | `include/veloco/io.h`, `src/net/backend.c`, `src/net/epoll_backend.c`, `src/net/uring_backend.c` (Tasks 5-6) |
 | Span | Page range divided into objects of one size class, with central/cache free lists, active/free counters, and debug metadata. | Memory | `src/memory/span.c` (Task 3) |
 | Arena | Request-lifetime allocation region whose mmap-backed blocks are released as a unit when reset or when the owning HTTP request completes. | Memory, HTTP | `src/memory/arena.c` (Task 3) |
 | Connection | HTTP socket, parser state, request arena, and the connection Task that owns them. | HTTP | `include/veloco/http.h`, `src/http/http_connection.c` (Task 8) |
@@ -31,10 +31,11 @@ here is a placeholder.
 | Central free list | Task 3's single-thread span list; it becomes lock-protected and P-shared in the multi-worker milestone. | Memory |
 | Backend | Abstraction over io_uring and epoll that exposes operations and completion results, not readiness types. | Async I/O |
 | Black-box Baseline | External behavior, smoke output, and benchmark data observed from `ef/` without copying or translating its implementation or tests. | Runtime |
-| SQE | Submission queue entry sent to the kernel. | Async I/O |
-| CQE | Completion queue entry returned by the kernel. | Async I/O |
+| Ring Worker | Dedicated pthread that exclusively owns one io_uring instance, translates synchronized commands into SQEs, and publishes backend-neutral Completions from CQEs. | Async I/O |
+| SQE | Submission queue entry prepared only by the Ring Worker; its `user_data` identifies one internal operation record. | Async I/O |
+| CQE | Kernel completion consumed only by the Ring Worker. The original operation CQE produces at most one public Completion; an async-cancel CQE is internal. | Async I/O |
 | Generation | Token attached to an I/O Request so a stale completion cannot wake a reused fd or Task. | Async I/O |
-| I/O Completion | Backend-neutral result preserving the exact Request, Task identity, and fd generation; epoll produces it after one operation following readiness, then Runtime wakes a Task-bound request. | Async I/O |
+| I/O Completion | Backend-neutral result preserving the exact Request, Task identity, and fd generation; epoll produces it after readiness adaptation and io_uring produces it from the original operation CQE. Runtime consumes it and wakes a Task-bound request. | Async I/O |
 | Parser | Incremental HTTP/1.1 request-line and header parser with size limits. | HTTP |
 | Router | Maps request method and path to handlers. | HTTP |
 | Response | HTTP/1.1 response with status, headers, and body encoding (Content-Length or chunked). | HTTP |
@@ -52,7 +53,8 @@ here is a placeholder.
 5. Every completion is checked against the request generation and the
    Task state before the Task is woken.
 6. Cancellation is cooperative and never frees an I/O buffer before the
-   matching completion has been discarded or matched.
+   original operation CQE resolves ownership. An async-cancel CQE never
+   creates a second user-visible Completion.
 7. Allocation is explicit-free only; there is no garbage collector.
 8. Waiting for I/O, a timer, or a synchronization primitive parks the
    Task and keeps the M available to other Tasks.
