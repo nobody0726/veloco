@@ -13,9 +13,9 @@ here is a placeholder.
 | Term | Definition | Owner | Implementation reference |
 | --- | --- | --- | --- |
 | Fiber | Thread-affine stackful execution context with READY/RUNNING/SUSPENDED/DONE state and a reserved, lazily mapped, guarded stack; the mechanism of context switching, not a scheduling policy. | Runtime | `include/veloco/fiber.h`, `src/fiber/fiber.c`, `src/fiber/fiber_x86_64.S`, `src/fiber/fiber_aarch64.S` (Task 2) |
-| Task/G | User-visible schedulable coroutine. A G owns a fiber, lifecycle state, parent context, cancellation/deadline state, and scheduling metadata. Task and G are synonyms in the runtime. | Runtime | `include/veloco/task.h`, `src/runtime/task.c`, `src/runtime/run_queue.c` |
-| P | Logical processor that owns a local runnable queue, allocator cache, timer queue, runtime counters, and remote-free queue. | Runtime, Memory | `src/runtime/worker.c`, `src/runtime/run_queue.c`, `src/memory/valloc.c` |
-| M | pthread worker that executes Tasks while holding a P; it may detach from a P for runtime-level waiting. | Runtime | `src/runtime/worker.c` |
+| Task/G | User-visible schedulable coroutine. In Task 4, a G owns a Fiber, lifecycle state, function/argument, FIFO membership, and join waiters. Parent context, cancellation/deadline state, and migration metadata are later extensions. Task and G are synonyms in the runtime. | Runtime | `include/veloco/task.h`, `src/runtime/task.c`, `src/runtime/scheduler.c` (Task 4) |
+| P | Future logical processor that owns a local runnable queue, allocator cache, timer queue, runtime counters, and remote-free queue. Task 4 has one Runtime queue and no P objects yet. | Runtime, Memory | `src/runtime/worker.c`, `src/runtime/run_queue.c`, `src/memory/valloc.c` (future) |
+| M | Future pthread worker that executes Tasks while holding a P; Task 4 uses only the Runtime owner thread. | Runtime | `src/runtime/worker.c` (future) |
 | I/O Request | Operation (accept, recv, send, connect, timeout, or cancel) whose kernel completion wakes a Task. | Async I/O | `include/veloco/io.h`, `src/net/backend.c`, `src/net/uring_backend.c` (Tasks 5-6) |
 | Span | Page range divided into objects of one size class, with central/cache free lists, active/free counters, and debug metadata. | Memory | `src/memory/span.c` (Task 3) |
 | Arena | Request-lifetime allocation region whose mmap-backed blocks are released as a unit when reset or when the owning HTTP request completes. | Memory, HTTP | `src/memory/arena.c` (Task 3) |
