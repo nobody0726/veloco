@@ -10,6 +10,8 @@
 
 typedef struct vl_task_waiter vl_task_waiter_t;
 typedef struct vl_runtime_impl vl_runtime_impl_t;
+typedef struct vl_io vl_io_t;
+typedef struct vl_io_completion vl_io_completion_t;
 
 struct vl_task {
     vl_runtime_impl_t *runtime;
@@ -23,6 +25,7 @@ struct vl_task {
     vl_task_t *waiters;
     vl_task_t *waiter_next;
     vl_task_t *waiting_on;
+    int waiting_for_io;
 };
 
 typedef struct vl_task_queue {
@@ -38,6 +41,8 @@ struct vl_runtime_impl {
     vl_task_t *current;
     pthread_t owner_thread;
     size_t task_stack_size;
+    vl_io_t *io_driver;
+    size_t io_waiting;
     int shutdown_requested;
     vl_runtime_stats_t stats;
 };
@@ -49,7 +54,11 @@ int vl_runtime_is_owner(const vl_runtime_impl_t *runtime);
 int vl_task_is_terminal(const vl_task_t *task);
 void vl_task_enqueue(vl_runtime_impl_t *runtime, vl_task_t *task);
 void vl_task_cancel_all(vl_runtime_impl_t *runtime);
-void vl_runtime_run_internal(vl_runtime_impl_t *runtime);
+int vl_runtime_run_internal(vl_runtime_impl_t *runtime);
 void vl_runtime_destroy_tasks(vl_runtime_impl_t *runtime);
+int vl_task_park_for_io(vl_task_t *task, vl_io_t *io);
+int vl_task_can_park_for_io(vl_task_t *task, vl_io_t *io);
+int vl_task_complete_io(vl_task_t *task,
+                        const vl_io_completion_t *completion);
 
 #endif

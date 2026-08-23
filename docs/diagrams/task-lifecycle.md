@@ -83,6 +83,11 @@ Runtime owner thread enters the Fiber scheduler, and a terminal Task is
 never enqueued again. Completed handles remain queryable until Runtime
 shutdown, when all Task and Fiber resources are reclaimed once.
 
+Task 5 implements the I/O branch: a Task-bound `vl_io_submit` changes
+RUNNING to WAITING and suspends its Fiber. Runtime polls epoll at a scheduler
+boundary; the matching Completion writes the Request result, changes WAITING
+to RUNNABLE, and appends the Task to the same FIFO queue.
+
 ## Task-to-Fiber boundary
 
 Task state describes scheduler eligibility; Fiber state describes whether a

@@ -65,6 +65,12 @@ void vl_task_cancel_all(vl_runtime_impl_t *runtime)
     }
     for (task = runtime->all_tasks; task != NULL; task = task->all_next) {
         if (!vl_task_is_terminal(task)) {
+            if (task->waiting_for_io) {
+                task->waiting_for_io = 0;
+                if (runtime->io_waiting != 0) {
+                    --runtime->io_waiting;
+                }
+            }
             task->state = VL_TASK_CANCELLED;
             ++runtime->stats.cancelled;
         }

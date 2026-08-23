@@ -26,6 +26,11 @@ black-box reference and belongs to none of these contexts.
   through spans and the page heap to `mmap`/`munmap`.
 - Async I/O owns kernel operation completion: submit an SQE, reap the
   CQE, validate the generation, store the result, and wake the Task.
+- Task 5 establishes that ownership with epoll: the backend borrows a Request
+  and buffer until one Completion is consumed, validates tracked fd
+  generations, and converts readiness into an accept/recv/send/connect
+  result. A Task-bound request parks in WAITING; Runtime drives epoll at a
+  scheduler boundary and enqueues the Task as RUNNABLE after completion.
 - HTTP owns protocol behavior and per-Connection/request lifetime; it
   uses only the public Runtime, Memory, and Async I/O APIs.
 - Public headers never expose epoll or io_uring-specific types.

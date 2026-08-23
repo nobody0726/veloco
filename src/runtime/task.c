@@ -1,6 +1,7 @@
 #include "runtime_internal.h"
 
 #include <veloco/memory.h>
+#include <veloco/io.h>
 
 #include <stdlib.h>
 #include <string.h>
@@ -113,6 +114,62 @@ void vl_yield(void)
     (void)vl_fiber_yield(&runtime->fiber_sched, 0);
 }
 
+vl_task_t *vl_task_current(void)
+{
+    return vl_current_runtime != NULL ? vl_current_runtime->current : NULL;
+}
+
+int vl_task_can_park_for_io(vl_task_t *task, vl_io_t *io)
+{
+    vl_runtime_impl_t *runtime = vl_current_runtime;
+
+    if (task == NULL || io == NULL || runtime == NULL ||
+        runtime->current != task || task->runtime != runtime ||
+        task->state != VL_TASK_RUNNING || task->waiting_for_io) {
+        return VL_ERROR_INVALID_STATE;
+    }
+    if (runtime->io_waiting != 0 && runtime->io_driver != io) {
+        return VL_ERROR_INVALID_STATE;
+    }
+    return VL_OK;
+}
+
+int vl_task_park_for_io(vl_task_t *task, vl_io_t *io)
+{
+    vl_runtime_impl_t *runtime = vl_current_runtime;
+
+    if (vl_task_can_park_for_io(task, io) != VL_OK) {
+        return VL_ERROR_INVALID_STATE;
+    }
+    runtime->io_driver = io;
+    task->waiting_for_io = 1;
+    task->state = VL_TASK_WAITING;
+    ++runtime->io_waiting;
+    (void)vl_fiber_yield(&runtime->fiber_sched, 0);
+    return task->state == VL_TASK_RUNNING ? VL_OK : VL_ERROR_INVALID_STATE;
+}
+
+int vl_task_complete_io(vl_task_t *task,
+                        const vl_io_completion_t *completion)
+{
+    vl_runtime_impl_t *runtime;
+
+    if (task == NULL || completion == NULL ||
+        (runtime = task->runtime) == NULL || !vl_runtime_is_owner(runtime) ||
+        task->state != VL_TASK_WAITING || !task->waiting_for_io ||
+        runtime->io_waiting == 0) {
+        return VL_ERROR_INVALID_STATE;
+    }
+    task->waiting_for_io = 0;
+    --runtime->io_waiting;
+    if (runtime->io_waiting == 0) {
+        runtime->io_driver = NULL;
+    }
+    task->state = VL_TASK_RUNNABLE;
+    vl_task_enqueue(runtime, task);
+    return VL_OK;
+}
+
 int vl_join(vl_task_t *task)
 {
     vl_runtime_impl_t *runtime;
@@ -143,12 +200,41 @@ vl_task_state_t vl_task_state(const vl_task_t *task)
     return task != NULL ? task->state : VL_TASK_CANCELLED;
 }
 
-void vl_runtime_run_internal(vl_runtime_impl_t *runtime)
+static int vl_runtime_poll_io(vl_runtime_impl_t *runtime, int timeout_ms)
+{
+    vl_io_completion_t completion;
+    int status;
+
+    if (runtime->io_driver == NULL || runtime->io_waiting == 0) {
+        return VL_ERROR_WOULD_BLOCK;
+    }
+    status = vl_io_poll(runtime->io_driver, timeout_ms, &completion);
+    return status;
+}
+
+int vl_runtime_run_internal(vl_runtime_impl_t *runtime)
 {
     vl_task_t *task;
     long result;
 
-    while ((task = vl_task_queue_pop(&runtime->runnable)) != NULL) {
+    for (;;) {
+        task = vl_task_queue_pop(&runtime->runnable);
+        if (task == NULL) {
+            int poll_status;
+
+            if (runtime->io_waiting == 0) {
+                break;
+            }
+            if (runtime->shutdown_requested != 0) {
+                vl_task_cancel_all(runtime);
+                break;
+            }
+            poll_status = vl_runtime_poll_io(runtime, -1);
+            if (poll_status != VL_OK) {
+                return poll_status;
+            }
+            continue;
+        }
         if (runtime->shutdown_requested != 0) {
             task->state = VL_TASK_CANCELLED;
             ++runtime->stats.cancelled;
@@ -173,7 +259,10 @@ void vl_runtime_run_internal(vl_runtime_impl_t *runtime)
         (void)result;
         runtime->current = NULL;
         vl_current_runtime = NULL;
+        while (vl_runtime_poll_io(runtime, 0) == VL_OK) {
+        }
     }
+    return VL_OK;
 }
 
 void vl_runtime_destroy_tasks(vl_runtime_impl_t *runtime)
@@ -234,7 +323,13 @@ int vl_runtime_run(vl_runtime_t *runtime)
     if (!vl_runtime_is_owner(impl) || impl->current != NULL) {
         return VL_ERROR_INVALID_STATE;
     }
-    vl_runtime_run_internal(impl);
+    {
+        int run_status = vl_runtime_run_internal(impl);
+
+        if (run_status != VL_OK) {
+            return run_status;
+        }
+    }
     if (impl->shutdown_requested != 0) {
         vl_task_cancel_all(impl);
         return VL_OK;
@@ -259,7 +354,8 @@ void vl_runtime_shutdown(vl_runtime_t *runtime)
     vl_runtime_impl_t *impl;
 
     if (runtime == NULL || (impl = runtime->impl) == NULL ||
-        !vl_runtime_is_owner(impl) || impl->current != NULL) {
+        !vl_runtime_is_owner(impl) || impl->current != NULL ||
+        (impl->io_driver != NULL && impl->io_driver->impl != NULL)) {
         return;
     }
     vl_task_cancel_all(impl);
