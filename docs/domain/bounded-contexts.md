@@ -18,6 +18,9 @@ black-box reference and belongs to none of these contexts.
 
 - Runtime owns Task scheduling and every state transition shown in
   [docs/diagrams/task-lifecycle.md](../diagrams/task-lifecycle.md).
+- Runtime synchronization objects are bound to one Runtime. Their FIFO
+  waiter lists are protected by the Runtime mutex, and contended operations
+  park Tasks so an M remains available.
 - Task 7 gives one `vl_runtime_t` a fixed set of P/M pairs, a protected global
   FIFO, P-local Chase-Lev deques, eventfd wake paths, and all Task handles.
   New Tasks can be stolen before first execution; a live Fiber remains bound

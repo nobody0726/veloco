@@ -78,6 +78,24 @@ flowchart LR
     READY --> RUN
 ```
 
+Synchronization wait path:
+
+```mermaid
+sequenceDiagram
+    participant G as Task/G
+    participant S as Sync object
+    participant R as Runtime mutex
+    participant M as Owner M
+    G->>R: lock sync state
+    R->>S: append G to FIFO waiters
+    R->>G: RUNNING -> WAITING
+    G->>M: yield Fiber
+    S->>R: unlock/post/send
+    R->>G: WAITING -> RUNNABLE
+    S->>M: eventfd wake
+    M->>G: resume and return result
+```
+
 Task 7 invariants are: a Task has at most one queue membership, executes on
 at most one M, and a terminal Task is never enqueued again. Each M enters
 only its P's Fiber scheduler. An unstarted Task may be stolen; after Fiber

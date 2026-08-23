@@ -844,11 +844,14 @@ and 100 concurrent-join runs; `veloco.task` and `veloco.queue` pass under
 ThreadSanitizer. New Tasks are stealable, while a created stackful Fiber is
 pinned to its first P until a separately verified migration mechanism exists.
 
-- [ ] **Step 4: Add Task-aware synchronization**
+- [x] **Step 4: Add Task-aware synchronization**
 
 Each primitive keeps a FIFO waiter list. When contention occurs, move the
 current Task to WAITING and yield. Unlock, post, or send moves a waiter
 back to RUNNABLE without blocking an M.
+
+Evidence (2026-08-23): `veloco.sync` passes mutex, semaphore, wait-group,
+buffered-channel, and close-wakeup tests in Linux arm64 epoll and TSan builds.
 
 - [ ] **Step 5: Add per-P timer heaps**
 

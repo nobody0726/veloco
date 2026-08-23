@@ -20,6 +20,10 @@ here is a placeholder.
 | Span | Page range divided into objects of one size class, with central/cache free lists, active/free counters, and debug metadata. | Memory | `src/memory/span.c` (Task 3) |
 | Arena | Request-lifetime allocation region whose mmap-backed blocks are released as a unit when reset or when the owning HTTP request completes. | Memory, HTTP | `src/memory/arena.c` (Task 3) |
 | Connection | HTTP socket, parser state, request arena, and the connection Task that owns them. | HTTP | `include/veloco/http.h`, `src/http/http_connection.c` (Task 8) |
+| Task mutex | Non-recursive Runtime-bound mutex that transfers ownership to the oldest parked Task instead of blocking an M. | Runtime | `include/veloco/sync.h`, `src/sync/task_mutex.c` |
+| Semaphore | Runtime-bound permit counter with a FIFO Task waiter queue. | Runtime | `include/veloco/sync.h`, `src/sync/semaphore.c` |
+| Wait group | Runtime-bound counter whose zero transition wakes all parked Tasks. | Runtime | `include/veloco/sync.h`, `src/sync/wait_group.c` |
+| Channel | Runtime-bound bounded FIFO message queue; capacity zero is a rendezvous and close wakes blocked senders/receivers. | Runtime | `include/veloco/sync.h`, `src/sync/channel.c` |
 
 ## Secondary terms
 

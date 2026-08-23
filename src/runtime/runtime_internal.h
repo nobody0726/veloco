@@ -32,6 +32,9 @@ struct vl_task {
     vl_task_t *waiters_tail;
     vl_task_t *waiter_next;
     vl_task_t *waiting_on;
+    void *wait_value;
+    void **wait_output;
+    int wait_result;
     vl_p_t *last_p;
     int executing;
     int wake_pending;
