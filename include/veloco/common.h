@@ -26,7 +26,8 @@ typedef enum vl_status {
     VL_ERROR_UNSUPPORTED = -4,
     VL_ERROR_INVALID_STATE = -5,
     VL_ERROR_WOULD_BLOCK = -6,
-    VL_ERROR_CLOSED = -7
+    VL_ERROR_CLOSED = -7,
+    VL_ERROR_CANCELLED = -8
 } vl_status_t;
 
 #if defined(__GNUC__) || defined(__clang__)

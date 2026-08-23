@@ -8,9 +8,21 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/eventfd.h>
+#include <time.h>
 #include <unistd.h>
 
 #define VL_RUNTIME_MAX_WORKERS ((size_t)64)
+
+uint64_t vl_runtime_now_ns(void)
+{
+    struct timespec now;
+
+    if (clock_gettime(CLOCK_MONOTONIC, &now) != 0) {
+        return 0;
+    }
+    return (uint64_t)now.tv_sec * UINT64_C(1000000000) +
+           (uint64_t)now.tv_nsec;
+}
 
 void vl_task_queue_push(vl_task_queue_t *queue, vl_task_t *task)
 {
@@ -233,6 +245,7 @@ static void vl_runtime_cleanup_partial(vl_runtime_impl_t *impl,
             close(impl->ps[index].event_fd);
         }
         vl_run_queue_destroy(&impl->ps[index].runnable);
+        vl_timer_heap_destroy(&impl->ps[index].timers);
     }
     free(impl->ps);
     pthread_cond_destroy(&impl->condition);
@@ -306,6 +319,11 @@ int vl_runtime_init_with_config(vl_runtime_t *runtime,
         p->id = index;
         p->event_fd = -1;
         p->init_status = VL_ERROR_SYSTEM;
+        if (vl_timer_heap_init(&p->timers) != VL_OK) {
+            vl_runtime_cleanup_partial(impl, index);
+            vl_allocator_shutdown();
+            return VL_ERROR_SYSTEM;
+        }
         if (vl_run_queue_init(&p->runnable, VL_P_RUN_QUEUE_CAPACITY) != VL_OK) {
             vl_runtime_cleanup_partial(impl, index);
             vl_allocator_shutdown();
@@ -426,6 +444,7 @@ void vl_runtime_shutdown(vl_runtime_t *runtime)
     for (index = 0; index < impl->worker_count; ++index) {
         close(impl->ps[index].event_fd);
         vl_run_queue_destroy(&impl->ps[index].runnable);
+        vl_timer_heap_destroy(&impl->ps[index].timers);
     }
     free(impl->ps);
     pthread_cond_destroy(&impl->condition);

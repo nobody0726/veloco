@@ -284,7 +284,11 @@ static void vl_worker_idle(vl_p_t *p)
     }
     should_wait = atomic_load_explicit(&runtime->running,
                                        memory_order_relaxed);
-    poll_timeout = runtime->io_waiting != 0 && p->id == 0 ? 10 : -1;
+    poll_timeout = vl_timers_timeout_ms(p);
+    if (runtime->io_waiting != 0 && p->id == 0 &&
+        (poll_timeout < 0 || poll_timeout > 10)) {
+        poll_timeout = 10;
+    }
     pthread_mutex_unlock(&runtime->mutex);
     if (!should_wait) {
         vl_runtime_wake_workers(runtime);
@@ -316,6 +320,7 @@ int vl_worker_run(vl_p_t *p)
     while (atomic_load_explicit(&runtime->running, memory_order_acquire)) {
         vl_task_t *task;
 
+        vl_timers_expire(p, vl_runtime_now_ns());
         while (vl_worker_poll_io(p) == VL_OK) {
         }
         task = vl_worker_next_task(p);

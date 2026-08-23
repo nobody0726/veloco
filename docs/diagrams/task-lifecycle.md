@@ -102,6 +102,16 @@ only its P's Fiber scheduler. An unstarted Task may be stolen; after Fiber
 creation it returns only to its owning P. Completed handles remain queryable
 until Runtime shutdown, when all Task and Fiber resources are reclaimed once.
 
+Timer path:
+
+```mermaid
+flowchart LR
+    RUNNING --> SLEEPING["insert deadline in P heap"]
+    SLEEPING --> EXPIRE{"deadline or cancel"}
+    EXPIRE --> RUNNABLE["remove node, wake once"]
+    RUNNABLE --> RUNNING
+```
+
 ```mermaid
 sequenceDiagram
     participant W as Waker Task

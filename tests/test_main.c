@@ -12,6 +12,7 @@ void vl_register_task_tests(void);
 void vl_register_queue_tests(void);
 void vl_register_io_tests(void);
 void vl_register_sync_tests(void);
+void vl_register_timer_tests(void);
 
 #define VL_TEST_CAPACITY 64
 
@@ -113,6 +114,9 @@ int main(int argc, char **argv)
     }
     if (strcmp(group, "all") == 0 || strcmp(group, "sync") == 0) {
         vl_register_sync_tests();
+    }
+    if (strcmp(group, "all") == 0 || strcmp(group, "timer") == 0) {
+        vl_register_timer_tests();
     }
     return vl_test_run_all(name_filter);
 }

@@ -853,11 +853,14 @@ back to RUNNABLE without blocking an M.
 Evidence (2026-08-23): `veloco.sync` passes mutex, semaphore, wait-group,
 buffered-channel, and close-wakeup tests in Linux arm64 epoll and TSan builds.
 
-- [ ] **Step 5: Add per-P timer heaps**
+- [x] **Step 5: Add per-P timer heaps**
 
 Implement insert, cancel, peek, and expire. A sleeping Task stores a timer
 handle and is made RUNNABLE exactly once when the deadline or cancellation
 wins.
+
+Evidence (2026-08-23): timer heap ordering/removal, monotonic Task sleep,
+and cross-Task cancellation pass in Linux arm64 epoll and TSan builds.
 
 - [ ] **Step 6: Add P-local allocator caches**
 

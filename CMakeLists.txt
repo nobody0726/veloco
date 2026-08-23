@@ -104,6 +104,8 @@ add_library(
         src/sync/semaphore.c
         src/sync/wait_group.c
         src/sync/channel.c
+        src/time/timer.c
+        src/time/timer_heap.c
         ${VELOCO_NET_SOURCES}
         src/memory/arena.c
         src/memory/debug_allocator.c
@@ -136,6 +138,7 @@ add_executable(
     tests/test_queue.c
     tests/test_io.c
     tests/test_sync.c
+    tests/test_timer.c
     ${VELOCO_FIBER_TEST_ASM}
 )
 target_include_directories(
@@ -168,6 +171,7 @@ if(BUILD_TESTING)
     add_test(NAME veloco.queue COMMAND veloco_tests --group queue)
     add_test(NAME veloco.io COMMAND veloco_tests --group io)
     add_test(NAME veloco.sync COMMAND veloco_tests --group sync)
+    add_test(NAME veloco.timer COMMAND veloco_tests --group timer)
     if(VELOCO_ENABLE_URING)
         add_test(NAME veloco.uring COMMAND veloco_uring_tests)
         set_tests_properties(veloco.uring PROPERTIES SKIP_RETURN_CODE 77)

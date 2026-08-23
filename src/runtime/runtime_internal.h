@@ -4,8 +4,10 @@
 #include <veloco/fiber.h>
 #include <veloco/runtime.h>
 #include <veloco/task.h>
+#include <veloco/timer.h>
 
 #include "run_queue.h"
+#include "../time/timer_heap.h"
 
 #include <pthread.h>
 #include <stdatomic.h>
@@ -35,6 +37,9 @@ struct vl_task {
     void *wait_value;
     void **wait_output;
     int wait_result;
+    vl_timer_node_t timer_node;
+    vl_p_t *timer_p;
+    int timer_result;
     vl_p_t *last_p;
     int executing;
     int wake_pending;
@@ -59,6 +64,7 @@ struct vl_p {
     int idle;
     vl_task_t *current;
     vl_runtime_p_stats_t stats;
+    vl_timer_heap_t timers;
 };
 
 struct vl_runtime_impl {
@@ -114,5 +120,9 @@ int vl_task_park_for_io(vl_task_t *task, vl_io_t *io);
 int vl_task_can_park_for_io(vl_task_t *task, vl_io_t *io);
 int vl_task_complete_io(vl_task_t *task,
                         const vl_io_completion_t *completion);
+
+uint64_t vl_runtime_now_ns(void);
+void vl_timers_expire(vl_p_t *p, uint64_t now_ns);
+int vl_timers_timeout_ms(vl_p_t *p);
 
 #endif

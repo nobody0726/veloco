@@ -24,6 +24,7 @@ here is a placeholder.
 | Semaphore | Runtime-bound permit counter with a FIFO Task waiter queue. | Runtime | `include/veloco/sync.h`, `src/sync/semaphore.c` |
 | Wait group | Runtime-bound counter whose zero transition wakes all parked Tasks. | Runtime | `include/veloco/sync.h`, `src/sync/wait_group.c` |
 | Channel | Runtime-bound bounded FIFO message queue; capacity zero is a rendezvous and close wakes blocked senders/receivers. | Runtime | `include/veloco/sync.h`, `src/sync/channel.c` |
+| Timer | Runtime-bound monotonic deadline node owned by a Task's P-local min-heap; expiry or cancellation wakes the Task exactly once. | Runtime | `include/veloco/timer.h`, `src/time/timer.c`, `src/time/timer_heap.c` |
 
 ## Secondary terms
 
