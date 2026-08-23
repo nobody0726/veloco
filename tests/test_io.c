@@ -17,6 +17,25 @@ static int poll_once(vl_io_t *io, vl_io_completion_t *completion)
     return vl_io_poll(io, 1000, completion);
 }
 
+static int io_init_epoll(vl_io_t *io)
+{
+    const vl_io_config_t config = {VL_IO_BACKEND_EPOLL, 0};
+
+    return vl_io_init_with_config(io, &config);
+}
+
+VL_TEST(io_default_selects_an_available_backend)
+{
+    vl_io_t io = {0};
+    vl_io_backend_t backend;
+
+    VL_REQUIRE(vl_io_init(&io) == VL_OK);
+    backend = vl_io_backend(&io);
+    VL_ASSERT(backend == VL_IO_BACKEND_EPOLL ||
+              backend == VL_IO_BACKEND_URING);
+    vl_io_destroy(&io);
+}
+
 VL_TEST(io_loopback_connect_accept_send_receive_and_eof)
 {
     vl_io_t io = {0};
@@ -30,7 +49,7 @@ VL_TEST(io_loopback_connect_accept_send_receive_and_eof)
     char received[32] = {0};
     char message[] = "veloco";
 
-    VL_REQUIRE(vl_io_init(&io) == VL_OK);
+    VL_REQUIRE(io_init_epoll(&io) == VL_OK);
     listener = vl_socket_listen_loopback(0, 8, &port);
     VL_REQUIRE(listener >= 0);
     listener_generation = vl_socket_generation(listener);
@@ -150,7 +169,7 @@ VL_TEST(io_completion_wakes_waiting_task)
                           0, sockets) == 0);
     VL_REQUIRE(vl_socket_track(sockets[0]) == VL_OK);
     VL_REQUIRE(vl_socket_track(sockets[1]) == VL_OK);
-    VL_REQUIRE(vl_io_init(&io) == VL_OK);
+    VL_REQUIRE(io_init_epoll(&io) == VL_OK);
     VL_REQUIRE(vl_runtime_init(&runtime) == VL_OK);
     fixture.io = &io;
     fixture.reader_fd = sockets[0];
@@ -211,7 +230,7 @@ VL_TEST(io_cancellation_wakes_waiting_task)
                           0, sockets) == 0);
     VL_REQUIRE(vl_socket_track(sockets[0]) == VL_OK);
     VL_REQUIRE(vl_socket_track(sockets[1]) == VL_OK);
-    VL_REQUIRE(vl_io_init(&io) == VL_OK);
+    VL_REQUIRE(io_init_epoll(&io) == VL_OK);
     VL_REQUIRE(vl_runtime_init(&runtime) == VL_OK);
     fixture.io = &io;
     fixture.fd = sockets[0];
@@ -256,7 +275,7 @@ VL_TEST(io_pending_request_requires_backend_teardown_before_runtime_teardown)
                           0, sockets) == 0);
     VL_REQUIRE(vl_socket_track(sockets[0]) == VL_OK);
     VL_REQUIRE(vl_socket_track(sockets[1]) == VL_OK);
-    VL_REQUIRE(vl_io_init(&io) == VL_OK);
+    VL_REQUIRE(io_init_epoll(&io) == VL_OK);
     VL_REQUIRE(vl_runtime_init(&runtime) == VL_OK);
     reader.io = &io;
     reader.fd = sockets[0];
@@ -296,7 +315,7 @@ VL_TEST(io_nonblocking_send_can_complete_partially)
     payload = malloc(PAYLOAD_SIZE);
     VL_REQUIRE(payload != NULL);
     memset(payload, 0x5a, PAYLOAD_SIZE);
-    VL_REQUIRE(vl_io_init(&io) == VL_OK);
+    VL_REQUIRE(io_init_epoll(&io) == VL_OK);
 
     request.op = VL_IO_SEND;
     request.fd = sockets[0];
@@ -323,7 +342,7 @@ VL_TEST(io_cancel_returns_owned_completion)
     uint16_t port;
     int listener;
 
-    VL_REQUIRE(vl_io_init(&io) == VL_OK);
+    VL_REQUIRE(io_init_epoll(&io) == VL_OK);
     listener = vl_socket_listen_loopback(0, 8, &port);
     VL_REQUIRE(listener >= 0);
     request.op = VL_IO_ACCEPT;
@@ -350,7 +369,7 @@ VL_TEST(io_close_before_wakeup_reports_stale_generation)
     int listener;
     int reuse_source[2] = {-1, -1};
 
-    VL_REQUIRE(vl_io_init(&io) == VL_OK);
+    VL_REQUIRE(io_init_epoll(&io) == VL_OK);
     listener = vl_socket_listen_loopback(0, 8, &port);
     VL_REQUIRE(listener >= 0);
     generation = vl_socket_generation(listener);
@@ -381,7 +400,7 @@ VL_TEST(io_rejects_unsupported_and_duplicate_requests)
     uint16_t port;
     int listener;
 
-    VL_REQUIRE(vl_io_init(&io) == VL_OK);
+    VL_REQUIRE(io_init_epoll(&io) == VL_OK);
     listener = vl_socket_listen_loopback(0, 8, &port);
     VL_REQUIRE(listener >= 0);
     first.op = VL_IO_ACCEPT;
@@ -405,7 +424,7 @@ VL_TEST(io_rejects_untracked_descriptors)
 
     VL_REQUIRE(socketpair(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC,
                           0, sockets) == 0);
-    VL_REQUIRE(vl_io_init(&io) == VL_OK);
+    VL_REQUIRE(io_init_epoll(&io) == VL_OK);
     request.op = VL_IO_RECV;
     request.fd = sockets[0];
     VL_ASSERT(vl_io_submit(&io, &request) == VL_ERROR_INVALID_STATE);
@@ -428,8 +447,8 @@ VL_TEST(io_allows_one_process_wide_waiter_per_descriptor)
                           0, sockets) == 0);
     VL_REQUIRE(vl_socket_track(sockets[0]) == VL_OK);
     VL_REQUIRE(vl_socket_track(sockets[1]) == VL_OK);
-    VL_REQUIRE(vl_io_init(&first_io) == VL_OK);
-    VL_REQUIRE(vl_io_init(&second_io) == VL_OK);
+    VL_REQUIRE(io_init_epoll(&first_io) == VL_OK);
+    VL_REQUIRE(io_init_epoll(&second_io) == VL_OK);
     first.op = VL_IO_RECV;
     first.fd = sockets[0];
     first.buf = &byte;
@@ -469,7 +488,7 @@ VL_TEST(io_rejects_non_owner_thread)
     io_non_owner_fixture_t fixture;
     pthread_t thread;
 
-    VL_REQUIRE(vl_io_init(&io) == VL_OK);
+    VL_REQUIRE(io_init_epoll(&io) == VL_OK);
     fixture.io = &io;
     fixture.status = VL_OK;
     VL_REQUIRE(pthread_create(&thread, NULL, poll_from_non_owner, &fixture) ==
@@ -481,6 +500,8 @@ VL_TEST(io_rejects_non_owner_thread)
 
 void vl_register_io_tests(void)
 {
+    vl_test_add("io_default_selects_an_available_backend",
+                io_default_selects_an_available_backend);
     vl_test_add("io_loopback_connect_accept_send_receive_and_eof",
                 io_loopback_connect_accept_send_receive_and_eof);
     vl_test_add("io_cancel_returns_owned_completion",

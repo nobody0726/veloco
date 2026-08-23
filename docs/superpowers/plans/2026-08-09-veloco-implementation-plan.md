@@ -736,32 +736,35 @@ Dedicated I/O workers and cross-thread P wakeups remain Task 6/7 work.
 - Create: `tests/test_uring.c`
 - Create: `docs/architecture/io.md`
 
-- [ ] **Step 1: Add optional liburing detection**
+- [x] **Step 1: Add optional liburing detection**
 
 When `VELOCO_ENABLE_URING=ON`, locate the system liburing package and
 link only the io_uring backend target. Emit a configure-time error that
 names the missing package when the option is explicitly enabled.
 
-- [ ] **Step 2: Write failing completion tests**
+- [x] **Step 2: Write failing completion tests**
 
 Cover accept, recv, send, connect, timeout, negative CQE results, and
 completion after close. Each request test must assert that the same Task
 and generation token are returned.
 
-- [ ] **Step 3: Implement one ring owned by one I/O worker**
+- [x] **Step 3: Implement one ring owned by one I/O worker**
 
 Initialize one ring, batch SQE preparation, submit operations, wait for
 CQEs, translate `cqe->res` into the backend-neutral result, and dispatch
-the completion to the Task's P queue. Keep request memory alive until
-the CQE is consumed.
+the completion to the owner Runtime queue. Keep request memory alive until
+the CQE is consumed. Task 7 replaces the single owner queue with P-local
+wakeup routing.
 
-- [ ] **Step 4: Implement cancellation and stale-completion checks**
+- [x] **Step 4: Implement cancellation and stale-completion checks**
 
-Associate every request with a generation token. On cancellation, mark
-the Task cancelled, submit an async cancel request when possible, and
-ignore a late completion after ownership has been resolved.
+Associate every request with a generation token. On cancellation, mark the
+operation cancellation-requested, submit an async cancel, and let only the
+original operation CQE publish a result. A Task-bound request resumes with
+`-ECANCELED` when cancellation wins; the internal cancel CQE never causes a
+second Task wakeup.
 
-- [ ] **Step 5: Run io_uring tests**
+- [x] **Step 5: Run io_uring tests**
 
 ```bash
 cmake -S . -B build-uring -DVELOCO_ENABLE_URING=ON
@@ -773,12 +776,30 @@ Expected: all completion tests pass on a kernel with the required
 io_uring support. The epoll-only build remains available when liburing
 is absent.
 
-- [ ] **Step 6: Update the io_uring sequence diagram**
+- [x] **Step 6: Update the io_uring sequence diagram**
 
 Update `docs/architecture/io.md` with the actual liburing calls,
 completion error mapping, cancellation ownership, and kernel capability
 assumptions. Update `docs/diagrams/io-completion.md` with the final SQE,
 CQE, generation-token, and Task-wakeup sequence.
+
+Completion evidence (2026-08-23): the optional liburing 2.5 backend builds
+with GCC 13 and Clang 18 on Linux arm64 with warnings treated as errors. A
+privileged Docker Desktop container executes the real ring path: explicit
+backend identity, accept/connect/send/recv, timeout, negative CQE, close
+before CQE, exact Request/Task/generation identity, Task wakeup, and 64-cycle
+async cancellation all pass; the uring suite also passes 20 consecutive
+runs. The default restricted container returns CTest skip code 77 for
+`EPERM`, while the generic API verifies epoll fallback independently.
+
+The full `dev`, `epoll`, `uring`, ASan, UBSan, TSan, and allocator-debug
+preset matrix passes. Dedicated uring builds also pass ASan, UBSan, and TSan,
+and the full Clang uring build passes all seven CTest groups. The worker owns
+all ring mutation, wakes through eventfd `POLL_ADD`, preserves operation
+storage across original/cancel CQEs, and publishes one backend-neutral
+Completion. Domain vocabulary, bounded-context ownership, class/flow
+diagrams, SQE/CQE sequences, cancellation races, capability assumptions, and
+deferred optimizations are documented.
 
 ## Task 7: Add G/P/M Scheduling and P-Local Allocation
 

@@ -5,6 +5,7 @@
 
 #include <pthread.h>
 #include <stddef.h>
+#include <stdint.h>
 
 typedef struct vl_io_waiter vl_io_waiter_t;
 typedef struct vl_io_completion_node vl_io_completion_node_t;
@@ -23,6 +24,8 @@ struct vl_io_completion_node {
 typedef struct vl_io_impl {
     int epoll_fd;
     pthread_t owner_thread;
+    vl_io_backend_t backend;
+    void *uring;
     vl_io_waiter_t *waiters;
     vl_io_completion_node_t *completed_head;
     vl_io_completion_node_t *completed_tail;
@@ -37,5 +40,21 @@ int vl_epoll_backend_poll(vl_io_impl_t *impl, int timeout_ms,
 int vl_socket_is_tracked(int fd);
 int vl_socket_claim(int fd, uint64_t generation);
 void vl_socket_release(int fd, uint64_t generation);
+int vl_socket_request_is_stale(const vl_io_request_t *request);
+
+#if defined(VELOCO_HAS_URING)
+int vl_uring_backend_init(vl_io_impl_t *impl, unsigned queue_depth);
+void vl_uring_backend_destroy(vl_io_impl_t *impl);
+int vl_uring_backend_submit(vl_io_impl_t *impl, vl_io_request_t *request);
+int vl_uring_backend_cancel(vl_io_impl_t *impl, vl_io_request_t *request);
+int vl_uring_backend_poll(vl_io_impl_t *impl, int timeout_ms,
+                          vl_io_completion_t *completion);
+int vl_io_worker_start(void **worker, unsigned queue_depth);
+void vl_io_worker_stop(void *worker);
+int vl_io_worker_submit(void *worker, vl_io_request_t *request);
+int vl_io_worker_cancel(void *worker, vl_io_request_t *request);
+int vl_io_worker_poll(void *worker, int timeout_ms,
+                      vl_io_completion_t *completion);
+#endif
 
 #endif

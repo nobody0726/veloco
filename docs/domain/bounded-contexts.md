@@ -31,6 +31,11 @@ black-box reference and belongs to none of these contexts.
   generations, and converts readiness into an accept/recv/send/connect
   result. A Task-bound request parks in WAITING; Runtime drives epoll at a
   scheduler boundary and enqueues the Task as RUNNABLE after completion.
+- Task 6 adds one dedicated Ring Worker per io_uring handle. The public owner
+  validates Requests and consumes Completions; the worker alone owns liburing
+  calls and exchanges commands/completions through synchronized queues.
+  Async I/O owns operation and cancellation CQEs, while Runtime retains
+  exclusive ownership of Task state transitions.
 - HTTP owns protocol behavior and per-Connection/request lifetime; it
   uses only the public Runtime, Memory, and Async I/O APIs.
 - Public headers never expose epoll or io_uring-specific types.

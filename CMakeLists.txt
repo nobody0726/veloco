@@ -78,6 +78,18 @@ if(VELOCO_ENABLE_URING)
     endif()
 endif()
 
+set(VELOCO_NET_SOURCES
+    src/net/backend.c
+    src/net/epoll_backend.c
+    src/net/socket.c
+)
+if(VELOCO_ENABLE_URING)
+    list(APPEND VELOCO_NET_SOURCES
+        src/net/uring_backend.c
+        src/net/io_worker.c
+    )
+endif()
+
 add_library(
     veloco
     STATIC
@@ -85,9 +97,7 @@ add_library(
         ${VELOCO_FIBER_ASM}
         src/runtime/task.c
         src/runtime/scheduler.c
-        src/net/backend.c
-        src/net/epoll_backend.c
-        src/net/socket.c
+        ${VELOCO_NET_SOURCES}
         src/memory/arena.c
         src/memory/debug_allocator.c
         src/memory/object_pool.c
@@ -102,6 +112,10 @@ target_include_directories(
     PRIVATE "${PROJECT_SOURCE_DIR}/src/memory"
 )
 target_link_libraries(veloco PUBLIC veloco_build_options Threads::Threads)
+if(VELOCO_ENABLE_URING)
+    target_link_libraries(veloco PRIVATE "${VELOCO_URING_TARGET}")
+    target_compile_definitions(veloco PRIVATE VELOCO_HAS_URING=1)
+endif()
 if(VELOCO_MEMORY_DEBUG)
     target_compile_definitions(veloco PUBLIC VELOCO_MEMORY_DEBUG=1)
 endif()
@@ -126,8 +140,15 @@ target_include_directories(
 target_link_libraries(veloco_tests PRIVATE veloco veloco_build_options Threads::Threads)
 
 if(VELOCO_ENABLE_URING)
-    target_link_libraries(veloco_tests PRIVATE "${VELOCO_URING_TARGET}")
-    target_compile_definitions(veloco_tests PRIVATE VELOCO_HAS_URING=1)
+    add_executable(veloco_uring_tests tests/test_uring.c)
+    target_include_directories(
+        veloco_uring_tests
+        PRIVATE "${PROJECT_SOURCE_DIR}/include"
+    )
+    target_link_libraries(
+        veloco_uring_tests
+        PRIVATE veloco veloco_build_options Threads::Threads
+    )
 endif()
 
 if(BUILD_TESTING)
@@ -137,6 +158,10 @@ if(BUILD_TESTING)
     add_test(NAME veloco.task COMMAND veloco_tests --group task)
     add_test(NAME veloco.queue COMMAND veloco_tests --group queue)
     add_test(NAME veloco.io COMMAND veloco_tests --group io)
+    if(VELOCO_ENABLE_URING)
+        add_test(NAME veloco.uring COMMAND veloco_uring_tests)
+        set_tests_properties(veloco.uring PROPERTIES SKIP_RETURN_CODE 77)
+    endif()
 endif()
 
 add_executable(veloco_bench_fiber benchmarks/bench_fiber.c)

@@ -110,14 +110,6 @@ static int vl_request_events(vl_io_op_t op, uint32_t *events)
     }
 }
 
-static int vl_generation_is_stale(const vl_io_request_t *request)
-{
-    uint64_t current = vl_socket_generation(request->fd);
-
-    return !vl_socket_is_tracked(request->fd) || current == 0 ||
-           current != request->generation;
-}
-
 int vl_epoll_backend_init(vl_io_impl_t *impl)
 {
     if (impl == NULL) {
@@ -275,7 +267,7 @@ static int vl_complete_stale_waiter(vl_io_impl_t *impl,
                                     vl_io_waiter_t *waiter,
                                     vl_io_completion_t *completion)
 {
-    if (!vl_generation_is_stale(waiter->request)) {
+    if (!vl_socket_request_is_stale(waiter->request)) {
         return 0;
     }
     completion->request = waiter->request;
@@ -309,7 +301,7 @@ static int vl_execute_ready(vl_io_impl_t *impl, vl_io_waiter_t *waiter,
     int accepted_fd;
     socklen_t error_length = sizeof(error);
 
-    if (vl_generation_is_stale(request)) {
+    if (vl_socket_request_is_stale(request)) {
         completion->result = -ESTALE;
     } else {
         switch (request->op) {
