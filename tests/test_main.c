@@ -8,6 +8,8 @@
 
 void vl_register_fiber_tests(void);
 void vl_register_memory_tests(void);
+void vl_register_task_tests(void);
+void vl_register_queue_tests(void);
 
 #define VL_TEST_CAPACITY 64
 
@@ -87,6 +89,12 @@ int main(int argc, char **argv)
     }
     if (strcmp(group, "all") == 0 || strcmp(group, "memory") == 0) {
         vl_register_memory_tests();
+    }
+    if (strcmp(group, "all") == 0 || strcmp(group, "task") == 0) {
+        vl_register_task_tests();
+    }
+    if (strcmp(group, "all") == 0 || strcmp(group, "queue") == 0) {
+        vl_register_queue_tests();
     }
     return vl_test_run_all();
 }

@@ -18,6 +18,10 @@ black-box reference and belongs to none of these contexts.
 
 - Runtime owns Task scheduling and every state transition shown in
   [docs/diagrams/task-lifecycle.md](../diagrams/task-lifecycle.md).
+- In Task 4, Runtime is a single-thread context: one `vl_runtime_t` owns one
+  Fiber scheduler, one intrusive FIFO runnable queue, and all Task handles.
+  `vl_spawn` appends RUNNABLE Tasks, `vl_yield` re-appends the current Task,
+  and `vl_join` parks it on the target wait list.
 - Memory owns the allocation lifecycle from `vl_malloc`/`vl_free`
   through spans and the page heap to `mmap`/`munmap`.
 - Async I/O owns kernel operation completion: submit an SQE, reap the

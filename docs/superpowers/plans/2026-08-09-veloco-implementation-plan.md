@@ -583,7 +583,7 @@ limitations are recorded in `docs/architecture/allocator.md`.
 - Create: `tests/test_task.c`
 - Create: `tests/test_queue.c`
 
-- [ ] **Step 1: Define Task states and public APIs**
+- [x] **Step 1: Define Task states and public APIs**
 
 ```c
 typedef enum {
@@ -604,40 +604,48 @@ int vl_join(vl_task_t *task);
 vl_task_state_t vl_task_state(const vl_task_t *task);
 ```
 
-- [ ] **Step 2: Write state-machine tests**
+- [x] **Step 2: Write state-machine tests**
 
 Test NEW to RUNNABLE to RUNNING to DONE, a yielding Task that resumes,
 and rejection of double completion. Assert that a Task waiting on a
 runtime operation is not placed in the runnable queue.
 
-- [ ] **Step 3: Implement a FIFO local queue**
+- [x] **Step 3: Implement a FIFO local queue**
 
 Start with a single-owner intrusive queue. The queue must support push,
 pop, and a test-only length query. Do not add work stealing until the
 single-thread behavior is covered.
 
-- [ ] **Step 4: Implement Task creation and destruction**
+- [x] **Step 4: Implement Task creation and destruction**
 
-Allocate Task metadata through `vl_malloc`, create its fiber, enqueue it
-as RUNNABLE, and release its fiber, wait metadata, and Task object exactly
-once after DONE or CANCELLED.
+Allocate Task metadata through `vl_malloc`, create its Fiber, and enqueue it
+as RUNNABLE. Keep terminal handles queryable until Runtime shutdown, then
+release each Fiber, wait-list link, and Task object exactly once.
 
-- [ ] **Step 5: Implement the scheduler loop**
+- [x] **Step 5: Implement the scheduler loop**
 
 Run the next Task, return when it yields or completes, and continue until
 the queue is empty and shutdown has been requested. Expose counters for
 spawned, completed, cancelled, and currently runnable Tasks.
 
-- [ ] **Step 6: Run single-thread runtime tests**
+- [x] **Step 6: Run single-thread runtime tests**
 
 ```bash
 ctest --test-dir build -R 'task|queue' --output-on-failure
 ```
 
-Expected: deterministic state transitions, no duplicate execution, and
-clean shutdown with zero active Tasks.
+Expected: deterministic state transitions, no duplicate execution, join
+wakeups, and clean shutdown with zero active Tasks.
 
-- [ ] **Step 7: Update the runtime domain model**
+- [x] **Step 7: Update the runtime domain model**
+
+Completion evidence (2026-08-23): Task, FIFO queue, yield/resume, join,
+shutdown, and terminal-state tests pass in the arm64 Docker development
+image under `epoll`, `dev` (io_uring-enabled build), and `asan` presets.
+Task metadata is reclaimed at Runtime shutdown, while completed handles
+remain valid for state inspection and repeated joins during the Runtime
+lifetime. The implementation is intentionally single-thread and does not
+claim G/P/M or work-stealing support yet.
 
 Update `docs/domain/bounded-contexts.md`, `docs/architecture/scheduler.md`,
 and `docs/diagrams/task-lifecycle.md` with the implemented Task states,
