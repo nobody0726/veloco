@@ -862,10 +862,15 @@ wins.
 Evidence (2026-08-23): timer heap ordering/removal, monotonic Task sleep,
 and cross-Task cancellation pass in Linux arm64 epoll and TSan builds.
 
-- [ ] **Step 6: Add P-local allocator caches**
+- [x] **Step 6: Add P-local allocator caches**
 
 Give each P a cache per small-object class. Refill and drain in batches,
 and enqueue cross-P frees into the owning P's remote-free queue.
+
+Evidence (2026-08-23): cross-P large-object free, concurrent four-P small
+allocation/free, and the existing allocator suite pass in Linux arm64 epoll
+and TSan builds. The central allocator mutex protects span and statistics
+state; object headers record owner P.
 
 - [ ] **Step 7: Run multi-thread stress tests**
 

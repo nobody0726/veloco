@@ -108,6 +108,7 @@ void vl_runtime_destroy_tasks(vl_runtime_impl_t *runtime);
 vl_p_t *vl_current_p(void);
 vl_runtime_impl_t *vl_current_runtime(void);
 void vl_context_set_current(vl_p_t *p, vl_task_t *task);
+void vl_memory_bind_p(size_t p_index);
 int vl_task_prepare_park(vl_task_state_t state);
 void vl_task_commit_park(void);
 

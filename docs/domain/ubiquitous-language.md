@@ -32,8 +32,9 @@ here is a placeholder.
 | --- | --- | --- |
 | SizeClass | Fixed object size bucket that requests are rounded up to. | Memory |
 | PageHeap | mmap-backed layer that acquires and releases page ranges. | Memory |
-| Cache | Single-thread fast path in Task 3, later owned by P; refilled from and drained to the central free list in batches. | Memory |
-| Central free list | Task 3's single-thread span list; it becomes lock-protected and P-shared in the multi-worker milestone. | Memory |
+| Cache | P-local free list for one size class, refilled from central spans in batches and fed by that P's remote-free queue. | Memory |
+| Central free list | Mutex-protected span free list shared by P caches and used for refill/drain. | Memory |
+| Remote-free queue | Intrusive queue owned by an allocation's P; a different P appends freed objects and the owner drains them at allocation safe points. | Memory |
 | Backend | Abstraction over io_uring and epoll that exposes operations and completion results, not readiness types. | Async I/O |
 | Black-box Baseline | External behavior, smoke output, and benchmark data observed from `ef/` without copying or translating its implementation or tests. | Runtime |
 | Ring Worker | Dedicated pthread that exclusively owns one io_uring instance, translates synchronized commands into SQEs, and publishes backend-neutral Completions from CQEs. | Async I/O |

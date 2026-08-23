@@ -26,11 +26,11 @@ typedef struct vl_pool {
 } vl_pool_t;
 
 /*
- * Task 3 memory state is affine to the thread that initializes it. Arena and
- * pool handles own their implementation pointers and must not be copied while
- * live. Destroy every arena and pool before allocator shutdown. Memory from an
- * arena or pool remains owned by that handle and must not be passed to
- * vl_free; return pool objects with vl_pool_free.
+ * vl_malloc/vl_free are safe across Runtime worker threads. Arena and pool
+ * handles own their implementation pointers and must not be copied or used
+ * concurrently while live. Destroy every arena and pool before allocator
+ * shutdown. Memory from an arena or pool remains owned by that handle and
+ * must not be passed to vl_free; return pool objects with vl_pool_free.
  */
 VL_API int vl_allocator_init(void);
 VL_API void vl_allocator_shutdown(void);

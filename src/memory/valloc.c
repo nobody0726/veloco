@@ -5,6 +5,28 @@
 #include <unistd.h>
 
 vl_memory_state_t vl_memory_global;
+static pthread_mutex_t vl_memory_mutex = PTHREAD_MUTEX_INITIALIZER;
+static _Thread_local size_t vl_memory_p_index;
+
+void vl_memory_lock(void)
+{
+    pthread_mutex_lock(&vl_memory_mutex);
+}
+
+void vl_memory_unlock(void)
+{
+    pthread_mutex_unlock(&vl_memory_mutex);
+}
+
+size_t vl_memory_current_p(void)
+{
+    return vl_memory_p_index < VL_MEMORY_MAX_P ? vl_memory_p_index : 0;
+}
+
+void vl_memory_bind_p(size_t p_index)
+{
+    vl_memory_p_index = p_index < VL_MEMORY_MAX_P ? p_index : 0;
+}
 
 size_t vl_memory_align_up(size_t value, size_t alignment)
 {
@@ -25,8 +47,7 @@ size_t vl_memory_align_up(size_t value, size_t alignment)
 
 int vl_memory_is_owner(void)
 {
-    return vl_memory_global.initialized &&
-           pthread_equal(vl_memory_global.owner_thread, pthread_self());
+    return vl_memory_global.initialized;
 }
 
 int vl_memory_ensure_initialized(void)
@@ -41,17 +62,20 @@ int vl_allocator_init(void)
 {
     long page_size;
 
+    vl_memory_lock();
     if (vl_memory_global.initialized) {
-        return vl_memory_is_owner() ? VL_OK : VL_ERROR_INVALID_STATE;
+        vl_memory_unlock();
+        return VL_OK;
     }
     page_size = sysconf(_SC_PAGESIZE);
     if (page_size <= 0 || ((size_t)page_size & ((size_t)page_size - 1)) != 0) {
+        vl_memory_unlock();
         return VL_ERROR_SYSTEM;
     }
     memset(&vl_memory_global, 0, sizeof(vl_memory_global));
     vl_memory_global.initialized = 1;
     vl_memory_global.page_size = (size_t)page_size;
-    vl_memory_global.owner_thread = pthread_self();
+    vl_memory_unlock();
     return VL_OK;
 }
 
@@ -65,6 +89,7 @@ void vl_allocator_shutdown(void)
     if (!vl_memory_is_owner()) {
         return;
     }
+    vl_memory_lock();
     for (span = vl_memory_global.all_spans; span != NULL; span = next_span) {
         next_span = span->all_next;
         vl_page_heap_release(span->mapping_base, span->mapping_size);
@@ -75,6 +100,7 @@ void vl_allocator_shutdown(void)
         vl_page_heap_release(large->mapping_base, large->mapping_size);
     }
     memset(&vl_memory_global, 0, sizeof(vl_memory_global));
+    vl_memory_unlock();
 }
 
 static int vl_stats_can_allocate(size_t size)
@@ -92,7 +118,9 @@ void vl_allocator_get_stats(vl_allocator_stats_t *out)
         memset(out, 0, sizeof(*out));
         return;
     }
+    vl_memory_lock();
     *out = vl_memory_global.stats;
+    vl_memory_unlock();
 }
 
 static vl_span_t *vl_find_refill_span(size_t class_index)
@@ -110,9 +138,25 @@ static vl_span_t *vl_find_refill_span(size_t class_index)
 
 static int vl_refill_cache(size_t class_index)
 {
-    vl_cache_t *cache = &vl_memory_global.caches[class_index];
+    size_t p_index = vl_memory_current_p();
+    vl_cache_t *cache = &vl_memory_global.caches[p_index][class_index];
+    vl_cache_t *remote = &vl_memory_global.remote[p_index][class_index];
     vl_span_t *span = vl_find_refill_span(class_index);
     size_t count = 0;
+
+    while (remote->head != NULL && count < VL_CACHE_REFILL) {
+        void *user = remote->head;
+
+        remote->head = *(void **)user;
+        --remote->count;
+        *(void **)user = cache->head;
+        cache->head = user;
+        ++cache->count;
+        ++count;
+    }
+    if (count == VL_CACHE_REFILL) {
+        return VL_OK;
+    }
 
     if (span == NULL && vl_span_create(class_index, &span) != VL_OK) {
         return VL_ERROR_OUT_OF_MEMORY;
@@ -133,7 +177,7 @@ static int vl_refill_cache(size_t class_index)
 
 static void *vl_cache_pop(size_t class_index)
 {
-    vl_cache_t *cache = &vl_memory_global.caches[class_index];
+    vl_cache_t *cache = &vl_memory_global.caches[vl_memory_current_p()][class_index];
     void *user;
     vl_object_header_t *header;
 
@@ -152,7 +196,7 @@ static void *vl_cache_pop(size_t class_index)
 
 static void vl_drain_cache(size_t class_index)
 {
-    vl_cache_t *cache = &vl_memory_global.caches[class_index];
+    vl_cache_t *cache = &vl_memory_global.caches[vl_memory_current_p()][class_index];
     size_t count = 0;
 
     while (count < VL_CACHE_REFILL && cache->head != NULL) {
@@ -170,7 +214,14 @@ static void vl_drain_cache(size_t class_index)
 
 static void vl_cache_push(vl_object_header_t *header, void *user)
 {
-    vl_cache_t *cache = &vl_memory_global.caches[header->span->class_index];
+    size_t current_p = vl_memory_current_p();
+    size_t owner_p = header->owner_p < VL_MEMORY_MAX_P ? header->owner_p : 0;
+    vl_cache_t *cache = &vl_memory_global.caches[owner_p][header->span->class_index];
+
+    if (current_p != owner_p) {
+        cache = &vl_memory_global.remote[owner_p][header->span->class_index];
+        ++vl_memory_global.stats.cross_p_frees;
+    }
 
     vl_debug_poison(user, header->capacity);
     *(void **)user = cache->head;
@@ -197,6 +248,8 @@ static void vl_initialize_header(vl_object_header_t *header, uint32_t kind,
     header->span = span;
     header->mapping_base = mapping_base;
     header->mapping_size = mapping_size;
+    header->reserved = 0;
+    header->owner_p = span != NULL ? span->owner_p : vl_memory_current_p();
     header->large_next = NULL;
 }
 
@@ -249,6 +302,7 @@ static void *vl_malloc_large(size_t size)
     header = mapping;
     vl_initialize_header(header, VL_OBJECT_LARGE, size, size, NULL, mapping,
                          mapping_size);
+    header->owner_p = vl_memory_current_p();
     vl_large_insert(header);
     vl_memory_global.stats.active_bytes += size;
     ++vl_memory_global.stats.active_objects;
@@ -269,18 +323,24 @@ void *vl_malloc(size_t size)
     if (vl_memory_ensure_initialized() != VL_OK) {
         return NULL;
     }
+    vl_memory_lock();
     if (!vl_stats_can_allocate(size)) {
+        vl_memory_unlock();
         return NULL;
     }
     class_index = vl_size_class_index(size);
     if (class_index >= VL_SIZE_CLASS_COUNT) {
-        return vl_malloc_large(size);
+        user = vl_malloc_large(size);
+        vl_memory_unlock();
+        return user;
     }
-    if (vl_memory_global.caches[class_index].head != NULL) {
+    if (vl_memory_global.caches[vl_memory_current_p()][class_index].head != NULL ||
+        vl_memory_global.remote[vl_memory_current_p()][class_index].head != NULL) {
         ++vl_memory_global.stats.cache_hits;
     }
     user = vl_cache_pop(class_index);
     if (user == NULL) {
+        vl_memory_unlock();
         return NULL;
     }
     header = vl_object_header_from_user(user);
@@ -290,6 +350,7 @@ void *vl_malloc(size_t size)
     vl_memory_global.stats.active_bytes += size;
     ++vl_memory_global.stats.active_objects;
     vl_debug_prepare(header, user);
+    vl_memory_unlock();
     return user;
 }
 
@@ -304,18 +365,22 @@ void vl_free(void *ptr)
     if (!vl_memory_is_owner()) {
         return;
     }
+    vl_memory_lock();
     header = vl_object_header_from_user(ptr);
     if (header->magic != VL_OBJECT_MAGIC ||
         header->state != VL_OBJECT_ALLOCATED) {
         vl_debug_abort();
+        vl_memory_unlock();
         return;
     }
     if (!vl_debug_validate(header, ptr)) {
+        vl_memory_unlock();
         return;
     }
     if (vl_memory_global.stats.active_objects == 0 ||
         vl_memory_global.stats.active_bytes < header->requested_size) {
         vl_debug_abort();
+        vl_memory_unlock();
         return;
     }
     requested = header->requested_size;
@@ -325,9 +390,11 @@ void vl_free(void *ptr)
     if (header->kind == VL_OBJECT_LARGE) {
         vl_large_remove(header);
         vl_page_heap_release(header->mapping_base, header->mapping_size);
+        vl_memory_unlock();
         return;
     }
     vl_cache_push(header, ptr);
+    vl_memory_unlock();
 }
 
 void *vl_calloc(size_t count, size_t size)
@@ -360,10 +427,12 @@ void *vl_realloc(void *ptr, size_t size)
     if (!vl_memory_is_owner()) {
         return NULL;
     }
+    vl_memory_lock();
     header = vl_object_header_from_user(ptr);
     if (header->magic != VL_OBJECT_MAGIC ||
         header->state != VL_OBJECT_ALLOCATED || !vl_debug_validate(header, ptr)) {
         vl_debug_abort();
+        vl_memory_unlock();
         return NULL;
     }
     if (size <= header->capacity) {
@@ -371,23 +440,27 @@ void *vl_realloc(void *ptr, size_t size)
 
         if (vl_memory_global.stats.active_bytes < header->requested_size) {
             vl_debug_abort();
+            vl_memory_unlock();
             return NULL;
         }
         retained_bytes = vl_memory_global.stats.active_bytes -
                          header->requested_size;
         if (retained_bytes > SIZE_MAX - size) {
+            vl_memory_unlock();
             return NULL;
         }
         header->requested_size = size;
         vl_memory_global.stats.active_bytes = retained_bytes + size;
         vl_debug_prepare(header, ptr);
+        vl_memory_unlock();
         return ptr;
     }
+    copy_size = header->requested_size < size ? header->requested_size : size;
+    vl_memory_unlock();
     replacement = vl_malloc(size);
     if (replacement == NULL) {
         return NULL;
     }
-    copy_size = header->requested_size < size ? header->requested_size : size;
     memcpy(replacement, ptr, copy_size);
     vl_free(ptr);
     return replacement;
@@ -401,6 +474,8 @@ int vl_memory_get_class_stats(size_t index, vl_memory_class_stats_t *out)
     if (vl_memory_ensure_initialized() != VL_OK) {
         return VL_ERROR_INVALID_STATE;
     }
+    vl_memory_lock();
     vl_span_class_stats(index, out);
+    vl_memory_unlock();
     return VL_OK;
 }

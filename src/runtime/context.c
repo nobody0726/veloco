@@ -15,6 +15,7 @@ vl_runtime_impl_t *vl_current_runtime(void)
 void vl_context_set_current(vl_p_t *p, vl_task_t *task)
 {
     vl_tls_p = p;
+    vl_memory_bind_p(p != NULL ? p->id : 0);
     if (p != NULL) {
         p->current = task;
     }

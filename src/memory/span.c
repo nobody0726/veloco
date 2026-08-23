@@ -58,6 +58,7 @@ int vl_span_create(size_t class_index, vl_span_t **out)
     span->mapping_size = mapping_size;
     span->class_index = class_index;
     span->capacity = capacity;
+    span->owner_p = vl_memory_current_p();
     span->object_stride = stride;
     objects = (unsigned char *)span->mapping_base +
               vl_memory_global.page_size;
@@ -77,6 +78,8 @@ int vl_span_create(size_t class_index, vl_span_t **out)
         header->state = VL_OBJECT_FREE;
         header->requested_size = 0;
         header->capacity = capacity;
+        header->owner_p = span->owner_p;
+        header->reserved = 0;
         header->span = span;
         header->mapping_base = NULL;
         header->mapping_size = 0;
