@@ -12,14 +12,19 @@ here is a placeholder.
 
 | Term | Definition | Owner | Implementation reference |
 | --- | --- | --- | --- |
-| Fiber | Thread-affine stackful execution context with READY/RUNNING/SUSPENDED/DONE state and a reserved, lazily mapped, guarded stack; the mechanism of context switching, not a scheduling policy. | Runtime | `include/veloco/fiber.h`, `src/fiber/fiber.c`, `src/fiber/fiber_x86_64.S`, `src/fiber/fiber_aarch64.S` (Task 2) |
-| Task/G | User-visible schedulable coroutine. In Task 4, a G owns a Fiber, lifecycle state, function/argument, FIFO membership, and join waiters. Parent context, cancellation/deadline state, and migration metadata are later extensions. Task and G are synonyms in the runtime. | Runtime | `include/veloco/task.h`, `src/runtime/task.c`, `src/runtime/scheduler.c` (Task 4) |
-| P | Future logical processor that owns a local runnable queue, allocator cache, timer queue, runtime counters, and remote-free queue. Task 4 has one Runtime queue and no P objects yet. | Runtime, Memory | `src/runtime/worker.c`, `src/runtime/run_queue.c`, `src/memory/valloc.c` (future) |
-| M | Future pthread worker that executes Tasks while holding a P; Task 4 uses only the Runtime owner thread. | Runtime | `src/runtime/worker.c` (future) |
+| Fiber | P-affine stackful execution context with READY/RUNNING/SUSPENDED/DONE state and a reserved, lazily mapped, guarded stack; the mechanism of context switching, not a scheduling policy. | Runtime | `include/veloco/fiber.h`, `src/fiber/fiber.c`, `src/fiber/fiber_x86_64.S`, `src/fiber/fiber_aarch64.S` |
+| Task/G | User-visible schedulable coroutine. A G owns a Fiber, lifecycle state, function/argument, queue membership, join waiters, and its last P. An unstarted G can be stolen; after Fiber creation it remains on that P. Task and G are synonyms. | Runtime | `include/veloco/task.h`, `src/runtime/task.c`, `src/runtime/scheduler.c` |
+| P | Logical processor with one owner M, a Chase-Lev runnable deque, Fiber scheduler, and counters. Timer and allocator-cache ownership are added in later Task 7 steps. | Runtime, Memory | `src/runtime/worker.c`, `src/runtime/run_queue.c`, `src/memory/valloc.c` |
+| M | Worker thread that owns one fixed P. M0 is the Runtime owner thread; remaining M instances are persistent pthreads parked through eventfd. | Runtime | `src/runtime/worker.c` |
 | I/O Request | Caller-owned operation descriptor containing op, fd, buffer/address/timeout data, generation, and Task identity. The selected backend borrows it until exactly one Completion is consumed or its handle is destroyed. | Async I/O | `include/veloco/io.h`, `src/net/backend.c`, `src/net/epoll_backend.c`, `src/net/uring_backend.c` (Tasks 5-6) |
 | Span | Page range divided into objects of one size class, with central/cache free lists, active/free counters, and debug metadata. | Memory | `src/memory/span.c` (Task 3) |
 | Arena | Request-lifetime allocation region whose mmap-backed blocks are released as a unit when reset or when the owning HTTP request completes. | Memory, HTTP | `src/memory/arena.c` (Task 3) |
 | Connection | HTTP socket, parser state, request arena, and the connection Task that owns them. | HTTP | `include/veloco/http.h`, `src/http/http_connection.c` (Task 8) |
+| Task mutex | Non-recursive Runtime-bound mutex that transfers ownership to the oldest parked Task instead of blocking an M. | Runtime | `include/veloco/sync.h`, `src/sync/task_mutex.c` |
+| Semaphore | Runtime-bound permit counter with a FIFO Task waiter queue. | Runtime | `include/veloco/sync.h`, `src/sync/semaphore.c` |
+| Wait group | Runtime-bound counter whose zero transition wakes all parked Tasks. | Runtime | `include/veloco/sync.h`, `src/sync/wait_group.c` |
+| Channel | Runtime-bound bounded FIFO message queue; capacity zero is a rendezvous and close wakes blocked senders/receivers. | Runtime | `include/veloco/sync.h`, `src/sync/channel.c` |
+| Timer | Runtime-bound monotonic deadline node owned by a Task's P-local min-heap; expiry or cancellation wakes the Task exactly once. | Runtime | `include/veloco/timer.h`, `src/time/timer.c`, `src/time/timer_heap.c` |
 
 ## Secondary terms
 
@@ -27,8 +32,9 @@ here is a placeholder.
 | --- | --- | --- |
 | SizeClass | Fixed object size bucket that requests are rounded up to. | Memory |
 | PageHeap | mmap-backed layer that acquires and releases page ranges. | Memory |
-| Cache | Single-thread fast path in Task 3, later owned by P; refilled from and drained to the central free list in batches. | Memory |
-| Central free list | Task 3's single-thread span list; it becomes lock-protected and P-shared in the multi-worker milestone. | Memory |
+| Cache | P-local free list for one size class, refilled from central spans in batches and fed by that P's remote-free queue. | Memory |
+| Central free list | Mutex-protected span free list shared by P caches and used for refill/drain. | Memory |
+| Remote-free queue | Intrusive queue owned by an allocation's P; a different P appends freed objects and the owner drains them at allocation safe points. | Memory |
 | Backend | Abstraction over io_uring and epoll that exposes operations and completion results, not readiness types. | Async I/O |
 | Black-box Baseline | External behavior, smoke output, and benchmark data observed from `ef/` without copying or translating its implementation or tests. | Runtime |
 | Ring Worker | Dedicated pthread that exclusively owns one io_uring instance, translates synchronized commands into SQEs, and publishes backend-neutral Completions from CQEs. | Async I/O |
@@ -43,8 +49,8 @@ here is a placeholder.
 ## Invariants
 
 1. A Task/G never executes simultaneously on two M threads.
-2. The allocator cache belongs to P, not M; a Task may migrate between M
-   threads without moving cache ownership.
+2. The allocator cache belongs to P, not M. An unstarted Task may be stolen,
+   but a Task with a live stackful Fiber remains bound to its first P.
 3. An object freed by a different P enters the owning P's remote-free
    queue and is drained at scheduler safe points or when that P's local
    cache needs maintenance.

@@ -5,6 +5,7 @@
 #include <errno.h>
 #include <pthread.h>
 #include <signal.h>
+#include <stdatomic.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -64,7 +65,7 @@ struct vl_fiber_sched_impl {
     void *signal_stack;
     size_t signal_stack_size;
     stack_t previous_signal_stack;
-    size_t live_fibers;
+    _Atomic size_t live_fibers;
 #if defined(VL_WITH_ASAN)
     void *root_asan_fake_stack;
 #endif
@@ -316,7 +317,7 @@ void vl_fiber_sched_destroy(vl_fiber_sched_t *sched)
     }
     impl = sched->impl;
     if (!vl_sched_is_owner(impl) || impl->current != NULL ||
-        impl->live_fibers != 0) {
+        atomic_load_explicit(&impl->live_fibers, memory_order_acquire) != 0) {
         return;
     }
 
@@ -401,7 +402,7 @@ int vl_fiber_create(vl_fiber_sched_t *sched, vl_fiber_t **out,
     }
 #endif
 
-    ++impl->live_fibers;
+    atomic_fetch_add_explicit(&impl->live_fibers, 1, memory_order_relaxed);
     *out = fiber;
     return VL_OK;
 }
@@ -491,6 +492,6 @@ void vl_fiber_destroy(vl_fiber_t *fiber)
     __tsan_destroy_fiber(fiber->tsan_fiber);
 #endif
     (void)munmap(fiber->stack_base, fiber->mapping_size);
-    --impl->live_fibers;
+    atomic_fetch_sub_explicit(&impl->live_fibers, 1, memory_order_acq_rel);
     free(fiber);
 }

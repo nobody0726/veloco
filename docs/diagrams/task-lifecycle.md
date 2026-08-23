@@ -78,10 +78,59 @@ flowchart LR
     READY --> RUN
 ```
 
-Task 4 invariants are: a Task has at most one queue membership, only the
-Runtime owner thread enters the Fiber scheduler, and a terminal Task is
-never enqueued again. Completed handles remain queryable until Runtime
-shutdown, when all Task and Fiber resources are reclaimed once.
+Synchronization wait path:
+
+```mermaid
+sequenceDiagram
+    participant G as Task/G
+    participant S as Sync object
+    participant R as Runtime mutex
+    participant M as Owner M
+    G->>R: lock sync state
+    R->>S: append G to FIFO waiters
+    R->>G: RUNNING -> WAITING
+    G->>M: yield Fiber
+    S->>R: unlock/post/send
+    R->>G: WAITING -> RUNNABLE
+    S->>M: eventfd wake
+    M->>G: resume and return result
+```
+
+Task 7 invariants are: a Task has at most one queue membership, executes on
+at most one M, and a terminal Task is never enqueued again. Each M enters
+only its P's Fiber scheduler. An unstarted Task may be stolen; after Fiber
+creation it returns only to its owning P. Completed handles remain queryable
+until Runtime shutdown, when all Task and Fiber resources are reclaimed once.
+
+Timer path:
+
+```mermaid
+flowchart LR
+    RUNNING --> SLEEPING["insert deadline in P heap"]
+    SLEEPING --> EXPIRE{"deadline or cancel"}
+    EXPIRE --> RUNNABLE["remove node, wake once"]
+    RUNNABLE --> RUNNING
+```
+
+```mermaid
+sequenceDiagram
+    participant W as Waker Task
+    participant R as Runtime mutex
+    participant G as Waiting Task/G
+    participant E as owner P eventfd
+    participant M as owner M
+    W->>R: lock and inspect G
+    alt G Fiber still executing
+        R->>G: wake_pending = true
+        G-->>M: yield to root
+        M->>G: WAITING -> RUNNABLE, enqueue
+    else G already parked
+        R->>G: WAITING -> RUNNABLE, enqueue for last_p
+    end
+    W->>E: write(1)
+    E-->>M: poll wakes
+    M->>G: RUNNABLE -> RUNNING
+```
 
 Task 5 implements the I/O branch: a Task-bound `vl_io_submit` changes
 RUNNING to WAITING and suspends its Fiber. Runtime polls epoll at a scheduler

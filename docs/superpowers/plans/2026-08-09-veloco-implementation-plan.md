@@ -820,42 +820,59 @@ deferred optimizations are documented.
 - Create: `tests/test_sync.c`
 - Create: `tests/test_timer.c`
 
-- [ ] **Step 1: Write queue race and stealing tests**
+- [x] **Step 1: Write queue race and stealing tests**
 
 Use multiple producer/consumer workers to assert that every task token is
 executed exactly once. Include an empty-queue steal, a single-item race,
 and a batch steal.
 
-- [ ] **Step 2: Implement P-local queues and global overflow**
+- [x] **Step 2: Implement P-local queues and global overflow**
 
 Add owner push/pop, thief steal, batch transfer, and a mutex-protected
 global queue. Use explicit C11 atomic memory orders and document why each
 order is required.
 
-- [ ] **Step 3: Add fixed M workers**
+- [x] **Step 3: Add fixed M workers**
 
 Create pthread workers, assign one P at a time, run local tasks, steal
 when idle, and sleep on an eventfd-backed wake path. Expose worker count
 and per-P statistics.
 
-- [ ] **Step 4: Add Task-aware synchronization**
+Evidence (2026-08-23): Linux arm64 epoll passes the complete six-group
+CTest suite. The Task group additionally passes 50 deterministic steal runs
+and 100 concurrent-join runs; `veloco.task` and `veloco.queue` pass under
+ThreadSanitizer. New Tasks are stealable, while a created stackful Fiber is
+pinned to its first P until a separately verified migration mechanism exists.
+
+- [x] **Step 4: Add Task-aware synchronization**
 
 Each primitive keeps a FIFO waiter list. When contention occurs, move the
 current Task to WAITING and yield. Unlock, post, or send moves a waiter
 back to RUNNABLE without blocking an M.
 
-- [ ] **Step 5: Add per-P timer heaps**
+Evidence (2026-08-23): `veloco.sync` passes mutex, semaphore, wait-group,
+buffered-channel, and close-wakeup tests in Linux arm64 epoll and TSan builds.
+
+- [x] **Step 5: Add per-P timer heaps**
 
 Implement insert, cancel, peek, and expire. A sleeping Task stores a timer
 handle and is made RUNNABLE exactly once when the deadline or cancellation
 wins.
 
-- [ ] **Step 6: Add P-local allocator caches**
+Evidence (2026-08-23): timer heap ordering/removal, monotonic Task sleep,
+and cross-Task cancellation pass in Linux arm64 epoll and TSan builds.
+
+- [x] **Step 6: Add P-local allocator caches**
 
 Give each P a cache per small-object class. Refill and drain in batches,
 and enqueue cross-P frees into the owning P's remote-free queue.
 
-- [ ] **Step 7: Run multi-thread stress tests**
+Evidence (2026-08-23): cross-P large-object free, concurrent four-P small
+allocation/free, and the existing allocator suite pass in Linux arm64 epoll
+and TSan builds. The central allocator mutex protects span and statistics
+state; object headers record owner P.
+
+- [x] **Step 7: Run multi-thread stress tests**
 
 ```bash
 cmake --build build-uring --parallel
@@ -865,12 +882,21 @@ ctest --test-dir build-uring -R 'queue|task|memory|sync|timer' --output-on-failu
 Expected: no lost wakeups, duplicate Task execution, allocator corruption,
 or timer double-fire across a long stress run.
 
-- [ ] **Step 8: Update scheduler and synchronization diagrams**
+Evidence (2026-08-23): arm64 GCC dev, epoll, uring, memory-debug, ASan,
+UBSan, and TSan builds pass their registered suites. Clang arm64 epoll also
+passes. The Docker kernel skips the io_uring runtime test; native CI remains
+the authoritative io_uring execution gate.
+
+- [x] **Step 8: Update scheduler and synchronization diagrams**
 
 Update `docs/architecture/scheduler.md` with the final G/P/M ownership
 rules, atomic memory orders, eventfd wake path, and measured stealing
 statistics. Add mutex, channel, semaphore, and timer wait paths to
 `docs/diagrams/task-lifecycle.md`.
+
+Evidence (2026-08-23): scheduler, synchronization, timer, and allocator
+architecture documents plus domain vocabulary and Mermaid lifecycle diagrams
+were updated with implemented ownership and wake protocols.
 
 ## Task 8: Integrate HTTP/1.1
 

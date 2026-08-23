@@ -20,6 +20,6 @@ typedef void (*vl_test_fn)(void);
 
 void vl_test_fail(const char *file, int line, const char *expr);
 void vl_test_add(const char *name, vl_test_fn fn);
-int vl_test_run_all(void);
+int vl_test_run_all(const char *name_filter);
 
 #endif

@@ -10,6 +10,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <signal.h>
+#include <stdatomic.h>
 #include <string.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -203,12 +204,13 @@ static void *memory_allocate_from_non_owner(void *argument)
 {
     memory_non_owner_result_t *result = argument;
 
+    vl_memory_bind_p(1);
     result->init_status = vl_allocator_init();
     result->allocation = vl_malloc(16);
     return NULL;
 }
 
-VL_TEST(memory_allocator_rejects_non_owner_thread)
+VL_TEST(memory_allocator_allows_cross_p_free)
 {
     pthread_t thread;
     memory_non_owner_result_t result = {0};
@@ -218,11 +220,77 @@ VL_TEST(memory_allocator_rejects_non_owner_thread)
     VL_REQUIRE(pthread_create(&thread, NULL, memory_allocate_from_non_owner,
                               &result) == 0);
     VL_REQUIRE(pthread_join(thread, NULL) == 0);
-    VL_ASSERT(result.init_status == VL_ERROR_INVALID_STATE);
-    VL_ASSERT(result.allocation == NULL);
+    VL_ASSERT(result.init_status == VL_OK);
+    VL_REQUIRE(result.allocation != NULL);
+    vl_free(result.allocation);
     vl_allocator_get_stats(&stats);
     VL_ASSERT(stats.active_bytes == 0);
     VL_ASSERT(stats.active_objects == 0);
+    VL_ASSERT(stats.cross_p_frees == 1);
+    vl_allocator_shutdown();
+}
+
+typedef struct allocator_worker_fixture {
+    pthread_barrier_t *barrier;
+    void ***slots;
+    size_t index;
+    _Atomic int *failed;
+} allocator_worker_fixture_t;
+
+static void *allocator_worker(void *argument)
+{
+    allocator_worker_fixture_t *fixture = argument;
+    size_t index;
+
+    vl_memory_bind_p(fixture->index + 1);
+    for (index = 0; index < 64; ++index) {
+        fixture->slots[fixture->index][index] =
+            index == 0 ? vl_malloc(40000 + fixture->index * 8)
+                       : vl_malloc(32 + index);
+        if (fixture->slots[fixture->index][index] == NULL) {
+            atomic_store_explicit(fixture->failed, 1, memory_order_release);
+        }
+    }
+    (void)pthread_barrier_wait(fixture->barrier);
+    for (index = 0; index < 64; ++index) {
+        vl_free(fixture->slots[(fixture->index + 1) % 4][index]);
+    }
+    (void)pthread_barrier_wait(fixture->barrier);
+    return NULL;
+}
+
+VL_TEST(memory_allocator_handles_concurrent_p_local_caches)
+{
+    enum { worker_count = 4, allocation_count = 64 };
+    pthread_t threads[worker_count];
+    pthread_barrier_t barrier;
+    allocator_worker_fixture_t fixtures[worker_count];
+    void *slots[worker_count][allocation_count] = {{0}};
+    void **slot_rows[worker_count];
+    _Atomic int failed = 0;
+    vl_allocator_stats_t stats;
+    size_t index;
+
+    VL_REQUIRE(vl_allocator_init() == VL_OK);
+    VL_REQUIRE(pthread_barrier_init(&barrier, NULL, worker_count) == 0);
+    for (index = 0; index < worker_count; ++index) {
+        slot_rows[index] = slots[index];
+        fixtures[index].barrier = &barrier;
+        fixtures[index].slots = slot_rows;
+        fixtures[index].index = index;
+        fixtures[index].failed = &failed;
+        VL_REQUIRE(pthread_create(&threads[index], NULL, allocator_worker,
+                                  &fixtures[index]) == 0);
+    }
+    for (index = 0; index < worker_count; ++index) {
+        VL_REQUIRE(pthread_join(threads[index], NULL) == 0);
+    }
+    pthread_barrier_destroy(&barrier);
+    VL_ASSERT(atomic_load_explicit(&failed, memory_order_acquire) == 0);
+    vl_allocator_get_stats(&stats);
+    VL_ASSERT(stats.active_objects == 0);
+    VL_ASSERT(stats.active_bytes == 0);
+    VL_ASSERT(stats.cross_p_frees >= worker_count);
     vl_allocator_shutdown();
 }
 
@@ -434,8 +502,10 @@ void vl_register_memory_tests(void)
                 memory_statistics_track_requested_bytes_and_objects);
     vl_test_add("memory_statistics_reject_counter_overflow",
                 memory_statistics_reject_counter_overflow);
-    vl_test_add("memory_allocator_rejects_non_owner_thread",
-                memory_allocator_rejects_non_owner_thread);
+    vl_test_add("memory_allocator_allows_cross_p_free",
+                memory_allocator_allows_cross_p_free);
+    vl_test_add("memory_allocator_handles_concurrent_p_local_caches",
+                memory_allocator_handles_concurrent_p_local_caches);
     vl_test_add("memory_invalid_handles_do_not_initialize_allocator",
                 memory_invalid_handles_do_not_initialize_allocator);
     vl_test_add("memory_arena_reset_releases_all_blocks",

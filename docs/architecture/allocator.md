@@ -1,10 +1,9 @@
-# valloc: Single-Thread Memory Architecture
+# valloc: P-Local Memory Architecture
 
-Task 3 implements the first allocator milestone: a Linux, single-thread,
-explicit-free allocator with a TCMalloc-like topology. It is intentionally
-separate from fiber stacks, which need guarded lazy mappings. P-local caches,
-remote-free queues, and concurrent central locks are deferred until the
-multi-worker runtime exists.
+Task 7 extends the Task 3 explicit-free allocator with a TCMalloc-like
+multi-worker topology. It remains separate from fiber stacks, which need
+guarded lazy mappings. A central mutex protects spans, page accounting, and
+statistics; each P has a local cache per size class and a remote-free queue.
 
 ## Ownership model
 
@@ -17,10 +16,14 @@ classDiagram
         +vl_realloc(ptr, size)
         +stats()
     }
-    class Cache {
+    class PLocalCache {
         +free list per size class
         +maximum 64 objects
         +refill batch 32 objects
+    }
+    class RemoteFreeQueue {
+        +owner P
+        +intrusive free objects
     }
     class Span {
         +one size class
@@ -43,20 +46,21 @@ classDiagram
         +fixed object size
         +reuse inactive objects
     }
-    Allocator --> Cache : small fast path
-    Cache --> Span : refill / drain
+    Allocator --> PLocalCache : current P fast path
+    Allocator --> RemoteFreeQueue : cross-P free
+    PLocalCache --> Span : refill / drain
     Span --> PageHeap : acquire mapping
     Allocator --> PageHeap : large path
     Arena --> PageHeap : block mapping
     Pool --> Allocator : object backing
 ```
 
-The allocator is thread-affine to the thread that called
-`vl_allocator_init`. The public handle types are intentionally non-copyable
-by convention: copying a live arena or pool handle would duplicate ownership
-of its implementation pointer. Every live arena and pool must be destroyed on
-that owner thread before `vl_allocator_shutdown`; shutdown is the final memory
-operation for the runtime instance.
+`vl_malloc`, `vl_free`, and statistics are safe across M threads. Runtime
+binds each worker to a P through a private TLS slot. An allocation records its
+owner P in the object header. A free on another P enters the owner's remote
+queue and increments `cross_p_frees`; the owner drains remote entries before
+central refill. Arena and pool handles remain non-copyable and must not be
+used concurrently through the same handle.
 
 ## Size classes
 
@@ -136,8 +140,9 @@ unaligned integer access. Release builds omit these checks from the hot path.
 `active_bytes` and `active_objects` describe currently allocated valloc
 objects. `cache_hits` counts allocations served from a non-empty local cache;
 `central_refills` counts refill batches; `mapped_bytes` includes spans, large
-objects, and arena blocks; `cross_p_frees` is zero in this single-thread
-milestone and becomes meaningful when P ownership is introduced.
+objects, and arena blocks; `cross_p_frees` counts frees performed by a P
+different from the allocation owner P. `cache_hits` includes local cache and
+pending remote-cache service.
 
 ## Benchmark evidence
 
@@ -165,3 +170,7 @@ analysis reports no findings for `src/memory`, and Valgrind reports zero
 errors and no memory left allocated after the non-debug memory test group.
 Docker Desktop cannot reserve TSan's shadow-memory layout for an emulated
 amd64 process, so native amd64 TSan is delegated to the GitHub CI runner.
+
+Task 7 evidence adds concurrent P-local cache allocation and cross-P free
+tests. Linux arm64 epoll and TSan memory groups pass; native amd64 and the
+full io_uring matrix remain release-gate work.

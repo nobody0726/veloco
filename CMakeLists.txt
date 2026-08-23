@@ -97,6 +97,15 @@ add_library(
         ${VELOCO_FIBER_ASM}
         src/runtime/task.c
         src/runtime/scheduler.c
+        src/runtime/run_queue.c
+        src/runtime/context.c
+        src/runtime/worker.c
+        src/sync/task_mutex.c
+        src/sync/semaphore.c
+        src/sync/wait_group.c
+        src/sync/channel.c
+        src/time/timer.c
+        src/time/timer_heap.c
         ${VELOCO_NET_SOURCES}
         src/memory/arena.c
         src/memory/debug_allocator.c
@@ -128,6 +137,8 @@ add_executable(
     tests/test_task.c
     tests/test_queue.c
     tests/test_io.c
+    tests/test_sync.c
+    tests/test_timer.c
     ${VELOCO_FIBER_TEST_ASM}
 )
 target_include_directories(
@@ -135,6 +146,7 @@ target_include_directories(
     PRIVATE
         "${PROJECT_SOURCE_DIR}/include"
         "${PROJECT_SOURCE_DIR}/src/memory"
+        "${PROJECT_SOURCE_DIR}/src/runtime"
         "${PROJECT_SOURCE_DIR}/tests"
 )
 target_link_libraries(veloco_tests PRIVATE veloco veloco_build_options Threads::Threads)
@@ -158,6 +170,8 @@ if(BUILD_TESTING)
     add_test(NAME veloco.task COMMAND veloco_tests --group task)
     add_test(NAME veloco.queue COMMAND veloco_tests --group queue)
     add_test(NAME veloco.io COMMAND veloco_tests --group io)
+    add_test(NAME veloco.sync COMMAND veloco_tests --group sync)
+    add_test(NAME veloco.timer COMMAND veloco_tests --group timer)
     if(VELOCO_ENABLE_URING)
         add_test(NAME veloco.uring COMMAND veloco_uring_tests)
         set_tests_properties(veloco.uring PROPERTIES SKIP_RETURN_CODE 77)

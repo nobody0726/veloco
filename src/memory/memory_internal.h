@@ -11,6 +11,7 @@
 #define VL_MEMORY_ALIGNMENT ((size_t)16)
 #define VL_CACHE_MAX ((size_t)64)
 #define VL_CACHE_REFILL ((size_t)32)
+#define VL_MEMORY_MAX_P ((size_t)64)
 
 #define VL_OBJECT_MAGIC UINT64_C(0x56454c4f434f4d45)
 #define VL_OBJECT_ALLOCATED ((uint32_t)1)
@@ -33,6 +34,8 @@ typedef struct vl_object_header {
     uint32_t state;
     size_t requested_size;
     size_t capacity;
+    size_t owner_p;
+    size_t reserved;
     vl_span_t *span;
     void *mapping_base;
     size_t mapping_size;
@@ -57,6 +60,7 @@ struct vl_span {
     size_t free_count;
     size_t active_count;
     size_t cached_count;
+    size_t owner_p;
     void *central_free;
     vl_span_t *central_next;
     vl_span_t *all_next;
@@ -72,7 +76,8 @@ typedef struct vl_memory_state {
     size_t page_size;
     pthread_t owner_thread;
     vl_allocator_stats_t stats;
-    vl_cache_t caches[VL_SIZE_CLASS_COUNT];
+    vl_cache_t caches[VL_MEMORY_MAX_P][VL_SIZE_CLASS_COUNT];
+    vl_cache_t remote[VL_MEMORY_MAX_P][VL_SIZE_CLASS_COUNT];
     vl_span_t *central[VL_SIZE_CLASS_COUNT];
     vl_span_t *all_spans;
     vl_object_header_t *large_allocations;
@@ -82,6 +87,10 @@ extern vl_memory_state_t vl_memory_global;
 
 int vl_memory_is_owner(void);
 int vl_memory_ensure_initialized(void);
+void vl_memory_lock(void);
+void vl_memory_unlock(void);
+size_t vl_memory_current_p(void);
+void vl_memory_bind_p(size_t p_index);
 size_t vl_memory_align_up(size_t value, size_t alignment);
 
 void *vl_page_heap_acquire(size_t pages, size_t *mapped_size);
