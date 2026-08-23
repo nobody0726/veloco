@@ -97,6 +97,9 @@ add_library(
         ${VELOCO_FIBER_ASM}
         src/runtime/task.c
         src/runtime/scheduler.c
+        src/runtime/run_queue.c
+        src/runtime/context.c
+        src/runtime/worker.c
         ${VELOCO_NET_SOURCES}
         src/memory/arena.c
         src/memory/debug_allocator.c
@@ -135,6 +138,7 @@ target_include_directories(
     PRIVATE
         "${PROJECT_SOURCE_DIR}/include"
         "${PROJECT_SOURCE_DIR}/src/memory"
+        "${PROJECT_SOURCE_DIR}/src/runtime"
         "${PROJECT_SOURCE_DIR}/tests"
 )
 target_link_libraries(veloco_tests PRIVATE veloco veloco_build_options Threads::Threads)

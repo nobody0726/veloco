@@ -12,10 +12,10 @@ here is a placeholder.
 
 | Term | Definition | Owner | Implementation reference |
 | --- | --- | --- | --- |
-| Fiber | Thread-affine stackful execution context with READY/RUNNING/SUSPENDED/DONE state and a reserved, lazily mapped, guarded stack; the mechanism of context switching, not a scheduling policy. | Runtime | `include/veloco/fiber.h`, `src/fiber/fiber.c`, `src/fiber/fiber_x86_64.S`, `src/fiber/fiber_aarch64.S` (Task 2) |
-| Task/G | User-visible schedulable coroutine. In Task 4, a G owns a Fiber, lifecycle state, function/argument, FIFO membership, and join waiters. Parent context, cancellation/deadline state, and migration metadata are later extensions. Task and G are synonyms in the runtime. | Runtime | `include/veloco/task.h`, `src/runtime/task.c`, `src/runtime/scheduler.c` (Task 4) |
-| P | Future logical processor that owns a local runnable queue, allocator cache, timer queue, runtime counters, and remote-free queue. Task 4 has one Runtime queue and no P objects yet. | Runtime, Memory | `src/runtime/worker.c`, `src/runtime/run_queue.c`, `src/memory/valloc.c` (future) |
-| M | Future pthread worker that executes Tasks while holding a P; Task 4 uses only the Runtime owner thread. | Runtime | `src/runtime/worker.c` (future) |
+| Fiber | P-affine stackful execution context with READY/RUNNING/SUSPENDED/DONE state and a reserved, lazily mapped, guarded stack; the mechanism of context switching, not a scheduling policy. | Runtime | `include/veloco/fiber.h`, `src/fiber/fiber.c`, `src/fiber/fiber_x86_64.S`, `src/fiber/fiber_aarch64.S` |
+| Task/G | User-visible schedulable coroutine. A G owns a Fiber, lifecycle state, function/argument, queue membership, join waiters, and its last P. An unstarted G can be stolen; after Fiber creation it remains on that P. Task and G are synonyms. | Runtime | `include/veloco/task.h`, `src/runtime/task.c`, `src/runtime/scheduler.c` |
+| P | Logical processor with one owner M, a Chase-Lev runnable deque, Fiber scheduler, and counters. Timer and allocator-cache ownership are added in later Task 7 steps. | Runtime, Memory | `src/runtime/worker.c`, `src/runtime/run_queue.c`, `src/memory/valloc.c` |
+| M | Worker thread that owns one fixed P. M0 is the Runtime owner thread; remaining M instances are persistent pthreads parked through eventfd. | Runtime | `src/runtime/worker.c` |
 | I/O Request | Caller-owned operation descriptor containing op, fd, buffer/address/timeout data, generation, and Task identity. The selected backend borrows it until exactly one Completion is consumed or its handle is destroyed. | Async I/O | `include/veloco/io.h`, `src/net/backend.c`, `src/net/epoll_backend.c`, `src/net/uring_backend.c` (Tasks 5-6) |
 | Span | Page range divided into objects of one size class, with central/cache free lists, active/free counters, and debug metadata. | Memory | `src/memory/span.c` (Task 3) |
 | Arena | Request-lifetime allocation region whose mmap-backed blocks are released as a unit when reset or when the owning HTTP request completes. | Memory, HTTP | `src/memory/arena.c` (Task 3) |
@@ -43,8 +43,8 @@ here is a placeholder.
 ## Invariants
 
 1. A Task/G never executes simultaneously on two M threads.
-2. The allocator cache belongs to P, not M; a Task may migrate between M
-   threads without moving cache ownership.
+2. The allocator cache belongs to P, not M. An unstarted Task may be stolen,
+   but a Task with a live stackful Fiber remains bound to its first P.
 3. An object freed by a different P enters the owning P's remote-free
    queue and is drained at scheduler safe points or when that P's local
    cache needs maintenance.

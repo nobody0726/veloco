@@ -820,23 +820,29 @@ deferred optimizations are documented.
 - Create: `tests/test_sync.c`
 - Create: `tests/test_timer.c`
 
-- [ ] **Step 1: Write queue race and stealing tests**
+- [x] **Step 1: Write queue race and stealing tests**
 
 Use multiple producer/consumer workers to assert that every task token is
 executed exactly once. Include an empty-queue steal, a single-item race,
 and a batch steal.
 
-- [ ] **Step 2: Implement P-local queues and global overflow**
+- [x] **Step 2: Implement P-local queues and global overflow**
 
 Add owner push/pop, thief steal, batch transfer, and a mutex-protected
 global queue. Use explicit C11 atomic memory orders and document why each
 order is required.
 
-- [ ] **Step 3: Add fixed M workers**
+- [x] **Step 3: Add fixed M workers**
 
 Create pthread workers, assign one P at a time, run local tasks, steal
 when idle, and sleep on an eventfd-backed wake path. Expose worker count
 and per-P statistics.
+
+Evidence (2026-08-23): Linux arm64 epoll passes the complete six-group
+CTest suite. The Task group additionally passes 50 deterministic steal runs
+and 100 concurrent-join runs; `veloco.task` and `veloco.queue` pass under
+ThreadSanitizer. New Tasks are stealable, while a created stackful Fiber is
+pinned to its first P until a separately verified migration mechanism exists.
 
 - [ ] **Step 4: Add Task-aware synchronization**
 

@@ -41,13 +41,19 @@ void vl_test_add(const char *name, vl_test_fn fn)
     ++vl_test_count;
 }
 
-int vl_test_run_all(void)
+int vl_test_run_all(const char *name_filter)
 {
     size_t index;
+    size_t executed = 0;
 
     for (index = 0; index < vl_test_count; ++index) {
         int failures_before = vl_test_failures;
 
+        if (name_filter != NULL &&
+            strcmp(name_filter, vl_test_cases[index].name) != 0) {
+            continue;
+        }
+        ++executed;
         vl_test_cases[index].fn();
         if (vl_test_failures == failures_before) {
             printf("PASS %s\n", vl_test_cases[index].name);
@@ -56,8 +62,8 @@ int vl_test_run_all(void)
         }
     }
 
-    printf("%zu tests, %d failures\n", vl_test_count, vl_test_failures);
-    return vl_test_failures == 0 ? 0 : 1;
+    printf("%zu tests, %d failures\n", executed, vl_test_failures);
+    return executed != 0 && vl_test_failures == 0 ? 0 : 1;
 }
 
 VL_TEST(common_status_codes_follow_sign_convention)
@@ -80,6 +86,9 @@ int main(int argc, char **argv)
     const char *group = argc == 3 && strcmp(argv[1], "--group") == 0
                             ? argv[2]
                             : "all";
+    const char *name_filter = argc == 3 && strcmp(argv[1], "--test") == 0
+                                  ? argv[2]
+                                  : NULL;
 
     if (strcmp(group, "all") == 0 || strcmp(group, "common") == 0) {
         vl_test_add("common_status_codes_follow_sign_convention",
@@ -101,5 +110,5 @@ int main(int argc, char **argv)
     if (strcmp(group, "all") == 0 || strcmp(group, "io") == 0) {
         vl_register_io_tests();
     }
-    return vl_test_run_all();
+    return vl_test_run_all(name_filter);
 }
