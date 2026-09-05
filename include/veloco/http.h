@@ -104,6 +104,7 @@ VL_API int vl_http_route(vl_http_server_t *server, const char *method,
                          const char *path, vl_http_handler_t handler,
                          void *user_data);
 VL_API void vl_http_server_request_shutdown(vl_http_server_t *server);
+VL_API size_t vl_http_server_active_connections(const vl_http_server_t *server);
 VL_API int vl_http_server_listen_loopback(vl_http_server_t *server,
                                           uint16_t port, int backlog,
                                           uint16_t *bound_port);

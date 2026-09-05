@@ -4,6 +4,7 @@
 #include <veloco/http.h>
 
 #include <stddef.h>
+#include <stdatomic.h>
 
 #define VL_HTTP_ROUTE_CAPACITY 64
 
@@ -18,8 +19,8 @@ struct vl_http_server {
     vl_http_config_t config;
     vl_http_route_entry_t routes[VL_HTTP_ROUTE_CAPACITY];
     size_t route_count;
-    size_t active_connections;
-    int shutdown_requested;
+    _Atomic size_t active_connections;
+    _Atomic int shutdown_requested;
 };
 
 const vl_http_route_entry_t *vl_http_find_route(

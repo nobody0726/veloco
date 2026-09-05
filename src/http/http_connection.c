@@ -64,7 +64,8 @@ static int vl_http_read_request(vl_http_server_t *server, vl_io_t *io, int fd,
             (void)vl_http_error_response(io, fd, http_status);
             return VL_ERROR_INVALID_ARGUMENT;
         }
-        if (server->shutdown_requested) {
+        if (atomic_load_explicit(&server->shutdown_requested,
+                                 memory_order_acquire)) {
             return VL_ERROR_CANCELLED;
         }
     }
@@ -111,9 +112,8 @@ static void vl_http_connection_task(void *argument)
 
     (void)vl_http_connection_run(task->server, task->io, task->fd);
     (void)vl_socket_close(task->fd);
-    if (task->server->active_connections != 0) {
-        --task->server->active_connections;
-    }
+    (void)atomic_fetch_sub_explicit(&task->server->active_connections, 1,
+                                    memory_order_acq_rel);
     free(task);
 }
 
@@ -125,8 +125,11 @@ int vl_http_spawn_connection(vl_http_server_t *server, vl_runtime_t *runtime,
     if (server == NULL || runtime == NULL || io == NULL || fd < 0) {
         return VL_ERROR_INVALID_ARGUMENT;
     }
-    if (server->shutdown_requested ||
-        server->active_connections >= server->config.max_connections) {
+    if (atomic_load_explicit(&server->shutdown_requested,
+                             memory_order_acquire) ||
+        atomic_load_explicit(&server->active_connections,
+                             memory_order_acquire) >=
+            server->config.max_connections) {
         return VL_ERROR_CLOSED;
     }
     task = calloc(1, sizeof(*task));
@@ -136,9 +139,11 @@ int vl_http_spawn_connection(vl_http_server_t *server, vl_runtime_t *runtime,
     task->server = server;
     task->io = io;
     task->fd = fd;
-    ++server->active_connections;
+    atomic_fetch_add_explicit(&server->active_connections, 1,
+                              memory_order_acq_rel);
     if (vl_spawn(runtime, vl_http_connection_task, task) == NULL) {
-        --server->active_connections;
+        atomic_fetch_sub_explicit(&server->active_connections, 1,
+                                  memory_order_acq_rel);
         free(task);
         return VL_ERROR_INVALID_STATE;
     }

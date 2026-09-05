@@ -54,6 +54,9 @@ int main(void)
     }
     vl_http_server_request_shutdown(server);
     (void)vl_socket_close(listener);
+    while (vl_http_server_active_connections(server) > 0) {
+        (void)vl_runtime_run(&runtime);
+    }
     vl_http_server_destroy(server);
     vl_io_destroy(&io);
     vl_runtime_shutdown(&runtime);

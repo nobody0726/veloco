@@ -941,7 +941,7 @@ Accept a connection, allocate its request state from a P-local cache,
 read and parse requests asynchronously, invoke middleware/router, write
 the response, and either reuse the connection or close it.
 
-- [ ] **Step 6: Add graceful shutdown**
+- [x] **Step 6: Add graceful shutdown**
 
 Stop accepting, stop spawning new connection Tasks, close idle
 connections, cancel timed-out active I/O, and wait for active Tasks before

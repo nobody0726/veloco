@@ -22,6 +22,9 @@ int vl_http_server_init(vl_http_server_t **server,
     if (impl->config.max_connections == 0) {
         impl->config.max_connections = VL_HTTP_DEFAULT_MAX_CONNECTIONS;
     }
+    atomic_store_explicit(&impl->active_connections, 0, memory_order_relaxed);
+    atomic_store_explicit(&impl->shutdown_requested, 0,
+                          memory_order_relaxed);
     *server = impl;
     return VL_OK;
 }
@@ -29,6 +32,15 @@ int vl_http_server_init(vl_http_server_t **server,
 void vl_http_server_destroy(vl_http_server_t *server)
 {
     free(server);
+}
+
+size_t vl_http_server_active_connections(const vl_http_server_t *server)
+{
+    if (server == NULL) {
+        return 0;
+    }
+    return atomic_load_explicit(&server->active_connections,
+                                memory_order_acquire);
 }
 
 int vl_http_route(vl_http_server_t *server, const char *method,

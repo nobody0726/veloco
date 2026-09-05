@@ -91,7 +91,8 @@ Shutdown is cooperative:
   state.
 - New routes are still queryable, but new connection tasks are rejected.
 - The application is responsible for ending the accept loop and then
-  letting running connection tasks drain before destroying the server.
+  letting running connection tasks drain to zero before destroying the
+  server.
 
 ## Verification notes
 
@@ -104,4 +105,3 @@ Task 8 HTTP tests cover:
 - fixed-length responses
 - chunked responses
 - malformed-request error responses
-
