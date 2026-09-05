@@ -170,6 +170,9 @@ static void vl_worker_execute(vl_p_t *p, vl_task_t *task)
                                         vl_task_entry, task);
     }
     if (resume_status == VL_OK) {
+        pthread_mutex_lock(&runtime->mutex);
+        ++runtime->stats.task_switches;
+        pthread_mutex_unlock(&runtime->mutex);
         vl_context_set_current(p, task);
         resume_status = vl_fiber_resume(&p->fiber_sched, task->fiber, 0,
                                         &result);

@@ -25,6 +25,7 @@ typedef struct vl_runtime_stats {
     size_t worker_count;
     size_t steals;
     size_t parks;
+    size_t task_switches;
 } vl_runtime_stats_t;
 
 typedef struct vl_runtime_p_stats {

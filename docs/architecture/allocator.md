@@ -141,8 +141,9 @@ unaligned integer access. Release builds omit these checks from the hot path.
 objects. `cache_hits` counts allocations served from a non-empty local cache;
 `central_refills` counts refill batches; `mapped_bytes` includes spans, large
 objects, and arena blocks; `cross_p_frees` counts frees performed by a P
-different from the allocation owner P. `cache_hits` includes local cache and
-pending remote-cache service.
+different from the allocation owner P; `mmap_calls` counts page heap
+acquisitions. `cache_hits` includes local cache and pending remote-cache
+service.
 
 ## Benchmark evidence
 

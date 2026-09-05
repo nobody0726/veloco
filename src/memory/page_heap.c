@@ -25,6 +25,7 @@ void *vl_page_heap_acquire(size_t pages, size_t *mapped_size)
     if (mapping == MAP_FAILED) {
         return NULL;
     }
+    ++vl_memory_global.stats.mmap_calls;
     vl_memory_global.stats.mapped_bytes += bytes;
     if (mapped_size != NULL) {
         *mapped_size = bytes;

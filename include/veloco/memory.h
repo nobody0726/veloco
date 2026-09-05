@@ -13,6 +13,7 @@ typedef struct vl_allocator_stats {
     size_t active_objects;
     size_t cache_hits;
     size_t central_refills;
+    size_t mmap_calls;
     size_t mapped_bytes;
     size_t cross_p_frees;
 } vl_allocator_stats_t;

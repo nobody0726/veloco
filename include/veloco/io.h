@@ -64,6 +64,12 @@ typedef struct vl_io_completion {
     vl_task_t *task;
 } vl_io_completion_t;
 
+typedef struct vl_io_stats {
+    size_t submissions;
+    size_t completions;
+    size_t cancellations;
+} vl_io_stats_t;
+
 /*
  * A submitted request and its buffer remain caller-owned and must stay valid
  * until vl_io_poll returns their completion or the owning I/O handle is
@@ -91,6 +97,7 @@ VL_API int vl_io_submit(vl_io_t *io, vl_io_request_t *request);
 VL_API int vl_io_cancel(vl_io_t *io, vl_io_request_t *request);
 VL_API int vl_io_poll(vl_io_t *io, int timeout_ms,
                       vl_io_completion_t *completion);
+VL_API void vl_io_get_stats(const vl_io_t *io, vl_io_stats_t *out);
 
 VL_API int vl_socket_set_nonblocking(int fd);
 VL_API int vl_socket_create_tcp(void);

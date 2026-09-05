@@ -79,6 +79,7 @@ void vl_yield(void)
     }
     atomic_store_explicit(&task->state, VL_TASK_RUNNABLE,
                           memory_order_release);
+    ++runtime->stats.task_switches;
     pthread_mutex_unlock(&runtime->mutex);
     (void)vl_fiber_yield(&p->fiber_sched, 0);
 }
@@ -133,6 +134,7 @@ int vl_join(vl_task_t *task)
     task->waiters_tail = current;
     ++runtime->stats.parks;
     ++p->stats.parks;
+    ++runtime->stats.task_switches;
     pthread_mutex_unlock(&runtime->mutex);
     (void)vl_fiber_yield(&p->fiber_sched, 0);
     return atomic_load_explicit(&task->state, memory_order_acquire) ==
@@ -204,6 +206,7 @@ int vl_task_park_for_io(vl_task_t *task, vl_io_t *io)
     ++runtime->io_waiting;
     ++runtime->stats.parks;
     ++p->stats.parks;
+    ++runtime->stats.task_switches;
     pthread_mutex_unlock(&runtime->mutex);
     (void)vl_fiber_yield(&p->fiber_sched, 0);
     return atomic_load_explicit(&task->state, memory_order_acquire) ==
