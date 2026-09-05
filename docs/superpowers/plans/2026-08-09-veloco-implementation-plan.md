@@ -976,13 +976,13 @@ arena lifetime, backpressure, and shutdown behavior. Update
 - Create: `docs/architecture/io.md`
 - Modify: `CMakeLists.txt`
 
-- [ ] **Step 1: Add runtime counters**
+- [x] **Step 1: Add runtime counters**
 
 Expose counters for task switches, task steals, runnable depth,
 allocator cache hits, central refills, mmap calls, I/O submissions,
 completions, cancellations, and active connections.
 
-- [ ] **Step 2: Add repeatable benchmark commands**
+- [x] **Step 2: Add repeatable benchmark commands**
 
 Run the same HTTP workload for:
 
@@ -996,7 +996,7 @@ Veloco multi-thread + io_uring + valloc
 Record machine, kernel, compiler, worker count, request count,
 concurrency, payload size, QPS, percentiles, CPU, RSS, and counters.
 
-- [ ] **Step 3: Run dynamic analysis**
+- [x] **Step 3: Run dynamic analysis**
 
 ```bash
 cmake -S . -B build-asan -DVELOCO_ENABLE_URING=ON -DVELOCO_ENABLE_SANITIZERS=ON
@@ -1007,20 +1007,20 @@ ctest --test-dir build-asan --output-on-failure
 Run a separate TSan build for scheduler, queue, allocator, and sync
 tests. Document any tests excluded because of assembly instrumentation.
 
-- [ ] **Step 4: Run long-duration and fault tests**
+- [x] **Step 4: Run long-duration and fault tests**
 
 Exercise client disconnects, server shutdown during active writes,
 cancellation during connect, repeated fd reuse, allocator pressure, and
 worker wake/sleep cycles. Run until at least one million short requests
 complete or the configured duration reaches thirty minutes.
 
-- [ ] **Step 5: Publish the evidence**
+- [x] **Step 5: Publish the evidence**
 
 Update `docs/benchmarks/veloco.md` with raw command lines, summarized
 results, graphs or tables, and known gaps. Update architecture docs with
 the final measured behavior rather than predicted performance.
 
-- [ ] **Step 6: Final verification**
+- [x] **Step 6: Final verification**
 
 Run:
 

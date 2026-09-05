@@ -172,3 +172,22 @@ Both Linux amd64 and arm64 remain supported build targets.
 - Registered files/buffers, multishot operations, buffer rings, SQPOLL, and
   per-P rings remain deferred. Epoll is the correctness fallback and
   benchmark comparison path.
+
+## Task 9 I/O counters
+
+`vl_io_get_stats()` reports three backend-neutral counters:
+
+- `submissions`
+- `completions`
+- `cancellations`
+
+The Task 9 HTTP benchmark records those counts so the workload can prove it
+is driving the real async path rather than a stub. In the 500-request HTTP
+sample, both x86_64 and aarch64 runs reported:
+
+- `io_submissions=1500`
+- `io_completions=1500`
+- `io_cancellations=0`
+
+That reflects one accept, one request read, and one response write per
+request in the current benchmark shape.

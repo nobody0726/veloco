@@ -29,6 +29,7 @@ typedef struct vl_io_impl {
     vl_io_waiter_t *waiters;
     vl_io_completion_node_t *completed_head;
     vl_io_completion_node_t *completed_tail;
+    vl_io_stats_t stats;
 } vl_io_impl_t;
 
 int vl_epoll_backend_init(vl_io_impl_t *impl);

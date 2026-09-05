@@ -198,6 +198,13 @@ add_executable(bench_alloc benchmarks/bench_alloc.c)
 target_include_directories(bench_alloc PRIVATE "${PROJECT_SOURCE_DIR}/include")
 target_link_libraries(bench_alloc PRIVATE veloco veloco_build_options)
 
+add_executable(veloco_bench_http benchmarks/bench_http.c)
+target_include_directories(
+    veloco_bench_http
+    PRIVATE "${PROJECT_SOURCE_DIR}/include"
+)
+target_link_libraries(veloco_bench_http PRIVATE veloco veloco_build_options)
+
 add_executable(veloco-httpd examples/http_server.c)
 target_include_directories(veloco-httpd PRIVATE "${PROJECT_SOURCE_DIR}/include")
 target_link_libraries(veloco-httpd PRIVATE veloco veloco_build_options)

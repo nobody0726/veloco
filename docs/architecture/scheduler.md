@@ -107,3 +107,23 @@ FIFO behavior, multi-worker exactly-once execution, deterministic stealing,
 spawn from a Task, concurrent join wakeups, shutdown quiescence, and per-P
 statistics. The queue and Task groups pass under ThreadSanitizer on Linux
 arm64.
+
+## Task 9 runtime counters
+
+`vl_runtime_get_stats()` now exposes `task_switches` alongside the
+existing spawn, completion, cancellation, runnable, steal, and park
+counters. The Task 9 HTTP benchmark uses those counters as its runtime
+evidence.
+
+On the 500-request HTTP sample recorded in
+[docs/benchmarks/veloco.md](../benchmarks/veloco.md), both x86_64 and
+aarch64 runs reported:
+
+- `task_switches=3500`
+- `steals=0`
+- `parks=1500`
+- `runnable=0`
+
+That matches the current owner-thread HTTP benchmark shape: worker count 1,
+no work stealing, and one runnable queue draining to zero at the end of each
+batch.

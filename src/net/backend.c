@@ -124,7 +124,11 @@ int vl_io_submit(vl_io_t *io, vl_io_request_t *request)
     } else {
         status = vl_epoll_backend_submit(impl, request);
     }
-    if (status != VL_OK || request->task == NULL) {
+    if (status != VL_OK) {
+        return status;
+    }
+    ++impl->stats.submissions;
+    if (request->task == NULL) {
         return status;
     }
     status = vl_task_park_for_io(request->task, io);
@@ -137,6 +141,7 @@ int vl_io_submit(vl_io_t *io, vl_io_request_t *request)
 int vl_io_cancel(vl_io_t *io, vl_io_request_t *request)
 {
     vl_io_impl_t *impl;
+    int status;
 
     if (io == NULL || io->impl == NULL || request == NULL) {
         return VL_ERROR_INVALID_ARGUMENT;
@@ -147,12 +152,17 @@ int vl_io_cancel(vl_io_t *io, vl_io_request_t *request)
     }
     if (impl->backend == VL_IO_BACKEND_URING) {
 #if defined(VELOCO_HAS_URING)
-        return vl_uring_backend_cancel(impl, request);
+        status = vl_uring_backend_cancel(impl, request);
 #else
-        return VL_ERROR_UNSUPPORTED;
+        status = VL_ERROR_UNSUPPORTED;
 #endif
+    } else {
+        status = vl_epoll_backend_cancel(impl, request);
     }
-    return vl_epoll_backend_cancel(impl, request);
+    if (status == VL_OK) {
+        ++impl->stats.cancellations;
+    }
+    return status;
 }
 
 int vl_io_poll(vl_io_t *io, int timeout_ms, vl_io_completion_t *completion)
@@ -181,6 +191,7 @@ int vl_io_poll(vl_io_t *io, int timeout_ms, vl_io_completion_t *completion)
     if (status != VL_OK) {
         return status;
     }
+    ++impl->stats.completions;
     if (vl_socket_request_is_stale(completion->request)) {
         if (completion->request->op == VL_IO_ACCEPT &&
             completion->result >= 0) {
@@ -199,4 +210,18 @@ int vl_io_poll(vl_io_t *io, int timeout_ms, vl_io_completion_t *completion)
         }
     }
     return VL_OK;
+}
+
+void vl_io_get_stats(const vl_io_t *io, vl_io_stats_t *out)
+{
+    const vl_io_impl_t *impl;
+
+    if (out == NULL) {
+        return;
+    }
+    memset(out, 0, sizeof(*out));
+    if (io == NULL || (impl = io->impl) == NULL) {
+        return;
+    }
+    *out = impl->stats;
 }
