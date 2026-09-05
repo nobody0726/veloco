@@ -13,8 +13,10 @@ void vl_register_queue_tests(void);
 void vl_register_io_tests(void);
 void vl_register_sync_tests(void);
 void vl_register_timer_tests(void);
+void vl_register_http_parser_tests(void);
+void vl_register_http_server_tests(void);
 
-#define VL_TEST_CAPACITY 64
+#define VL_TEST_CAPACITY 128
 
 typedef struct vl_test_case {
     const char *name;
@@ -117,6 +119,10 @@ int main(int argc, char **argv)
     }
     if (strcmp(group, "all") == 0 || strcmp(group, "timer") == 0) {
         vl_register_timer_tests();
+    }
+    if (strcmp(group, "all") == 0 || strcmp(group, "http") == 0) {
+        vl_register_http_parser_tests();
+        vl_register_http_server_tests();
     }
     return vl_test_run_all(name_filter);
 }

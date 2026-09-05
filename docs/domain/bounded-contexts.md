@@ -12,7 +12,7 @@ black-box reference and belongs to none of these contexts.
 | Runtime | Fiber, Task/G, P, M, scheduler, run queues, timers, synchronization primitives, shutdown | Task functions, I/O completions, allocator statistics | `include/veloco/runtime.h`, `include/veloco/task.h`, `include/veloco/sync.h`, `include/veloco/timer.h` |
 | Memory | SizeClass, Span, PageHeap, P-local caches, central free list, Arena, object pools, debug allocator | Linux `mmap`/`munmap`, scheduler safe points for remote frees | `include/veloco/memory.h` |
 | Async I/O | I/O Requests, Backend interface, io_uring/epoll rings, SQE/CQE, Generation tokens | FDs, Task parking decisions, runtime workers | `include/veloco/io.h` |
-| HTTP | Connection, Parser, Router, Response, middleware, connection limits, backpressure | Public Task, allocator, and async I/O APIs | `include/veloco/http.h` |
+| HTTP | Connection, Parser, Router, Response, connection limits, fixed-length and chunked response writing, cooperative shutdown | Public Task, allocator, and async I/O APIs | `include/veloco/http.h` |
 
 ## Ownership rules
 
@@ -40,7 +40,12 @@ black-box reference and belongs to none of these contexts.
   Async I/O owns operation and cancellation CQEs, while Runtime retains
   exclusive ownership of Task state transitions.
 - HTTP owns protocol behavior and per-Connection/request lifetime; it
-  uses only the public Runtime, Memory, and Async I/O APIs.
+  uses only the public Runtime, Memory, and Async I/O APIs. The
+  connection task owns the accepted socket, parser buffer, and response
+  writer state until the task exits.
+- HTTP server shutdown is cooperative: the application stops accepting,
+  marks the server shut down, and lets active connection Tasks finish
+  through the Runtime before releasing the server object.
 - Public headers never expose epoll or io_uring-specific types.
 
 ## Shared language and anti-corruption notes
