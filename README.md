@@ -25,6 +25,8 @@ code, or tests are copied into Veloco.
 - `docs/superpowers/plans/2026-08-09-veloco-implementation-plan.md` -
   task-by-task implementation plan
 - `docs/domain/` - ubiquitous language and bounded contexts
+- `docs/domain/ddd-walkthrough.md` - DDD design walkthrough mapped to the codebase
+- `docs/domain/domain-model-and-flows.md` - complete domain model and business-flow sequence diagrams
 - `docs/architecture/` - implemented runtime contracts, ABI layouts,
   ownership rules, and measured evidence
 - `docs/diagrams/` - system, Task lifecycle, I/O completion, and
