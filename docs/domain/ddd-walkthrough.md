@@ -670,30 +670,30 @@ Async I/O 只持有一个不透明关联，不拥有 Task，也没有权力迁�
 
 ```mermaid
 sequenceDiagram
-    participant G as "HTTP Connection Task"
-    participant R as "Runtime aggregate"
-    participant I as "I/O handle"
-    participant E as "Epoll backend"
-    participant K as "Linux socket"
-    participant F as "Fiber/root scheduler"
+    participant G as HTTP Connection Task
+    participant R as Runtime aggregate
+    participant I as I/O handle
+    participant E as Epoll backend
+    participant K as Linux socket
+    participant F as Fiber/root scheduler
 
-    G->>I: "vl_io_submit(request.task = current Task)"
-    I->>E: "validate + claim fd + register waiter"
-    I->>R: "vl_task_can_park_for_io"
-    R->>R: "Task RUNNING -> WAITING; io_waiting++"
-    G->>F: "vl_fiber_yield"
-    F->>R: "scheduler regains control"
-    R->>I: "worker 0 calls vl_io_poll(timeout=0)"
-    I->>E: "epoll_wait / execute one nonblocking operation"
-    E->>K: "recv/send/accept/connect"
-    K-->>E: "readiness and result"
-    E-->>I: "one Completion(request, task, generation)"
-    I->>I: "stale generation check; write Request result"
-    I->>R: "vl_task_complete_io(task, completion)"
-    R->>R: "WAITING -> RUNNABLE; queued once"
-    R->>F: "wake eventfd"
-    F->>G: "resume Fiber; vl_io_submit returns"
-    G->>G: "read request.result and continue"
+    G->>I: vl_io_submit(request.task = current Task)
+    I->>E: validate + claim fd + register waiter
+    I->>R: vl_task_can_park_for_io
+    R->>R: Task RUNNING -> WAITING; io_waiting++
+    G->>F: vl_fiber_yield
+    F->>R: scheduler regains control
+    R->>I: worker 0 calls vl_io_poll(timeout=0)
+    I->>E: epoll_wait / execute one nonblocking operation
+    E->>K: recv/send/accept/connect
+    K-->>E: readiness and result
+    E-->>I: one Completion(request, task, generation)
+    I->>I: stale generation check; write Request result
+    I->>R: vl_task_complete_io(task, completion)
+    R->>R: WAITING -> RUNNABLE; queued once
+    R->>F: wake eventfd
+    F->>G: resume Fiber; vl_io_submit returns
+    G->>G: read request.result and continue
 ```
 
 这个流程中没有“业务 callback”。`vl_io_poll` 是应用服务式消费入口，
@@ -705,28 +705,28 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    participant G as "Task on Runtime owner M"
-    participant I as "vl_io_impl"
-    participant C as "command queue"
-    participant W as "Ring Worker"
-    participant K as "io_uring/kernel"
-    participant D as "completion queue"
-    participant R as "Runtime"
+    participant G as Task on Runtime owner M
+    participant I as vl_io_impl
+    participant C as command queue
+    participant W as Ring Worker
+    participant K as io_uring/kernel
+    participant D as completion queue
+    participant R as Runtime
 
-    G->>I: "vl_io_submit(request)"
-    I->>C: "append SUBMIT operation under worker mutex"
-    I->>W: "write eventfd"
-    I->>R: "park Task: RUNNING -> WAITING"
-    W->>C: "drain commands"
-    W->>K: "prepare SQE + submit"
-    K-->>W: "operation CQE"
-    W->>W: "map cqe->res; release fd claim once"
-    W->>D: "publish one resolved operation"
-    D-->>I: "vl_io_worker_poll returns Completion"
-    I->>I: "write Request; validate generation"
-    I->>R: "vl_task_complete_io(task, completion)"
-    R->>R: "WAITING -> RUNNABLE; wake owner worker"
-    R-->>G: "resume Fiber; submit returns"
+    G->>I: vl_io_submit(request)
+    I->>C: append SUBMIT operation under worker mutex
+    I->>W: write eventfd
+    I->>R: park Task: RUNNING -> WAITING
+    W->>C: drain commands
+    W->>K: prepare SQE + submit
+    K-->>W: operation CQE
+    W->>W: map cqe->res; release fd claim once
+    W->>D: publish one resolved operation
+    D-->>I: vl_io_worker_poll returns Completion
+    I->>I: write Request; validate generation
+    I->>R: vl_task_complete_io(task, completion)
+    R->>R: WAITING -> RUNNABLE; wake owner worker
+    R-->>G: resume Fiber; submit returns
 ```
 
 io_uring 的内部 CQE、cancel CQE、SQE 和 `vl_uring_operation` 都属于

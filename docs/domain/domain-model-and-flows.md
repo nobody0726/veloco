@@ -310,53 +310,53 @@ Fiber stack 不属于普通 valloc 对象。它需要 guard page、lazy mapping 
 
 ```mermaid
 sequenceDiagram
-    participant A as "Application"
-    participant R as "Runtime root"
-    participant P as "P array"
-    participant M as "Worker M / pthread"
-    participant F as "Fiber scheduler"
-    participant T as "Allocator TLS"
+    participant A as Application
+    participant R as Runtime root
+    participant P as P array
+    participant M as Worker M / pthread
+    participant F as Fiber scheduler
+    participant T as Allocator TLS
 
-    A->>R: "vl_runtime_init_with_config"
-    R->>R: "validate worker_count and stack_size"
-    R->>P: "allocate P[0..N-1]"
+    A->>R: vl_runtime_init_with_config
+    R->>R: validate worker_count and stack_size
+    R->>P: allocate P[0..N-1]
     loop each P
-        R->>P: "init local queue + timer heap + eventfd"
+        R->>P: init local queue + timer heap + eventfd
     end
-    R->>F: "init P0 Fiber scheduler"
-    R->>T: "bind P0"
+    R->>F: init P0 Fiber scheduler
+    R->>T: bind P0
     loop P1..Pn
-        R->>M: "pthread_create(worker)"
-        M->>F: "init Fiber scheduler on worker thread"
-        M->>T: "bind worker P"
-        M-->>R: "workers_ready++"
+        R->>M: pthread_create(worker)
+        M->>F: init Fiber scheduler on worker thread
+        M->>T: bind worker P
+        M-->>R: workers_ready++
     end
-    R->>R: "running = true"
-    R-->>A: "VL_OK"
+    R->>R: running = true
+    R-->>A: VL_OK
 ```
 
 ### 5.2 I/O handle 初始化和 Backend 选择
 
 ```mermaid
 sequenceDiagram
-    participant A as "Application"
-    participant I as "I/O root"
-    participant U as "Uring adapter"
-    participant W as "Ring Worker"
-    participant E as "Epoll adapter"
+    participant A as Application
+    participant I as I/O root
+    participant U as Uring adapter
+    participant W as Ring Worker
+    participant E as Epoll adapter
 
-    A->>I: "vl_io_init"
-    I->>I: "default URING when compiled"
+    A->>I: vl_io_init
+    I->>I: default URING when compiled
     alt io_uring available
-        I->>U: "vl_uring_backend_init"
-        U->>W: "start worker + initialize ring"
-        W-->>U: "startup status"
-        U-->>I: "URING selected"
+        I->>U: vl_uring_backend_init
+        U->>W: start worker + initialize ring
+        W-->>U: startup status
+        U-->>I: URING selected
     else unsupported kernel or build
-        I->>E: "vl_epoll_backend_init"
-        E-->>I: "EPOLL selected"
+        I->>E: vl_epoll_backend_init
+        E-->>I: EPOLL selected
     end
-    I-->>A: "vl_io_backend + VL_OK"
+    I-->>A: vl_io_backend + VL_OK
 ```
 
 自动初始化在 unsupported 情况下回退 epoll；显式 URING 配置不静默回退。
@@ -365,21 +365,21 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    participant A as "Application"
-    participant S as "HTTP Server root"
-    participant C as "Config"
-    participant RT as "Runtime"
-    participant IO as "I/O handle"
+    participant A as Application
+    participant S as HTTP Server root
+    participant C as Config
+    participant RT as Runtime
+    participant IO as I/O handle
 
-    A->>S: "vl_http_server_init(config)"
-    S->>C: "apply defaults and clamp limits"
-    S->>S: "routes empty; active=0; shutdown=false"
-    S-->>A: "server handle"
-    A->>S: "vl_http_route(method, path, handler)"
-    S->>S: "append Route entry"
-    A->>IO: "listen socket + track fd"
-    A->>RT: "vl_runtime_run"
-    Note over S,RT: "Accepted fd is checked against shutdown and max_connections"
+    A->>S: vl_http_server_init(config)
+    S->>C: apply defaults and clamp limits
+    S->>S: routes empty; active=0; shutdown=false
+    S-->>A: server handle
+    A->>S: vl_http_route(method, path, handler)
+    S->>S: append Route entry
+    A->>IO: listen socket + track fd
+    A->>RT: vl_runtime_run
+    Note over S,RT: Accepted fd is checked against shutdown and max_connections
 ```
 
 ## 6. Runtime 流程
@@ -388,47 +388,47 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    participant Caller as "Owner thread or current Task"
-    participant R as "Runtime root"
-    participant Q as "Global/Local queue"
-    participant M as "Worker M"
-    participant G as "Task/G"
-    participant F as "Fiber"
+    participant Caller as Owner thread or current Task
+    participant R as Runtime root
+    participant Q as Global/Local queue
+    participant M as Worker M
+    participant G as Task/G
+    participant F as Fiber
 
-    Caller->>R: "vl_spawn(fn, arg)"
-    R->>G: "create Task; state NEW"
-    R->>R: "RUNNABLE; add all_tasks/live_tasks"
-    R->>Q: "enqueue once; queued=1"
-    R-->>M: "eventfd wake"
-    M->>Q: "local pop, global pull, or steal"
-    M->>G: "queued=0; RUNNABLE -> RUNNING"
-    M->>F: "create/resume Fiber on last_p"
-    F->>G: "invoke vl_task_fn"
-    G-->>F: "function returns"
-    F-->>M: "Fiber DONE"
-    M->>R: "RUNNING -> DONE; live_tasks--"
-    R->>R: "wake join waiters"
-    M->>F: "destroy Fiber on owning P"
+    Caller->>R: vl_spawn(fn, arg)
+    R->>G: create Task; state NEW
+    R->>R: RUNNABLE; add all_tasks/live_tasks
+    R->>Q: enqueue once; queued=1
+    R-->>M: eventfd wake
+    M->>Q: local pop, global pull, or steal
+    M->>G: queued=0; RUNNABLE -> RUNNING
+    M->>F: create/resume Fiber on last_p
+    F->>G: invoke vl_task_fn
+    G-->>F: function returns
+    F-->>M: Fiber DONE
+    M->>R: RUNNING -> DONE; live_tasks--
+    R->>R: wake join waiters
+    M->>F: destroy Fiber on owning P
 ```
 
 ### 6.2 Yield 和可迁移性
 
 ```mermaid
 sequenceDiagram
-    participant G as "Running Task"
-    participant R as "Runtime mutex"
-    participant F as "Fiber scheduler"
-    participant Q as "Runnable queue"
-    participant M as "Owner M/P"
+    participant G as Running Task
+    participant R as Runtime mutex
+    participant F as Fiber scheduler
+    participant Q as Runnable queue
+    participant M as Owner M/P
 
-    G->>R: "vl_yield"
-    R->>R: "RUNNING -> RUNNABLE; task_switches++"
-    G->>F: "yield to runtime root"
-    F-->>M: "return from resume"
-    M->>R: "observe state after Fiber return"
-    R->>Q: "enqueue for same P/global policy"
-    Q-->>M: "next eligible Task"
-    M->>F: "resume same Task Fiber"
+    G->>R: vl_yield
+    R->>R: RUNNING -> RUNNABLE; task_switches++
+    G->>F: yield to runtime root
+    F-->>M: return from resume
+    M->>R: observe state after Fiber return
+    R->>Q: enqueue for same P/global policy
+    Q-->>M: next eligible Task
+    M->>F: resume same Task Fiber
 ```
 
 未创建 Fiber 的 Task 可以被 steal；已有 stackful Fiber 的 Task 必须回到创建
@@ -438,53 +438,53 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    participant W as "Waiting Task"
-    participant R as "Runtime root"
-    participant T as "Target Task"
-    participant F as "W Fiber"
-    participant Q as "Runnable queue"
+    participant W as Waiting Task
+    participant R as Runtime root
+    participant T as Target Task
+    participant F as W Fiber
+    participant Q as Runnable queue
 
-    W->>R: "vl_join(T)"
-    R->>R: "verify same Runtime and target not terminal"
-    R->>T: "append W to T.waiters FIFO"
-    R->>W: "RUNNING -> WAITING"
-    W->>F: "yield Fiber"
-    Note over W,F: "M executes other work"
-    T->>R: "function returns"
-    R->>T: "RUNNING -> DONE"
-    R->>W: "remove waiter link; wake"
-    R->>Q: "WAITING -> RUNNABLE; enqueue once"
-    Q-->>W: "resume W Fiber"
-    W-->>W: "vl_join returns VL_OK"
+    W->>R: vl_join(T)
+    R->>R: verify same Runtime and target not terminal
+    R->>T: append W to T.waiters FIFO
+    R->>W: RUNNING -> WAITING
+    W->>F: yield Fiber
+    Note over W,F: M executes other work
+    T->>R: function returns
+    R->>T: RUNNING -> DONE
+    R->>W: remove waiter link; wake
+    R->>Q: WAITING -> RUNNABLE; enqueue once
+    Q-->>W: resume W Fiber
+    W-->>W: vl_join returns VL_OK
 ```
 
 ### 6.4 Sync 对象 park/wake
 
 ```mermaid
 sequenceDiagram
-    participant G as "Task"
-    participant S as "Mutex/Semaphore/Channel"
-    participant R as "Runtime mutex"
-    participant Q as "FIFO waiter queue"
-    participant F as "Fiber"
-    participant M as "Worker"
+    participant G as Task
+    participant S as Mutex/Semaphore/Channel
+    participant R as Runtime mutex
+    participant Q as FIFO waiter queue
+    participant F as Fiber
+    participant M as Worker
 
-    G->>S: "lock/wait/send/receive"
-    S->>R: "lock Runtime mutex"
+    G->>S: lock/wait/send/receive
+    S->>R: lock Runtime mutex
     alt resource available or receiver matches
-        R->>S: "consume/transfer value or ownership"
-        S-->>G: "return VL_OK"
+        R->>S: consume/transfer value or ownership
+        S-->>G: return VL_OK
     else contended
-        S->>Q: "append current Task FIFO"
-        R->>G: "RUNNING -> WAITING"
-        G->>F: "vl_task_commit_park"
-        F-->>M: "M returns to scheduler"
-        Note over S,Q: "another Task unlocks/posts/sends/closes"
-        S->>R: "pop oldest waiter and set result"
-        R->>G: "WAITING -> RUNNABLE"
-        R-->>M: "eventfd wake"
-        M->>F: "resume G"
-        F-->>G: "sync API returns wait_result"
+        S->>Q: append current Task FIFO
+        R->>G: RUNNING -> WAITING
+        G->>F: vl_task_commit_park
+        F-->>M: M returns to scheduler
+        Note over S,Q: another Task unlocks/posts/sends/closes
+        S->>R: pop oldest waiter and set result
+        R->>G: WAITING -> RUNNABLE
+        R-->>M: eventfd wake
+        M->>F: resume G
+        F-->>G: sync API returns wait_result
     end
 ```
 
@@ -492,28 +492,28 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    participant G as "Task"
-    participant T as "Timer handle"
-    participant R as "Runtime mutex"
-    participant H as "Owner P timer heap"
-    participant M as "Worker M"
-    participant F as "Fiber"
+    participant G as Task
+    participant T as Timer handle
+    participant R as Runtime mutex
+    participant H as Owner P timer heap
+    participant M as Worker M
+    participant F as Fiber
 
-    G->>T: "vl_timer_arm(delay_ns)"
-    T->>R: "validate current Task and runtime"
-    R->>G: "RUNNING -> SLEEPING"
-    R->>H: "insert deadline node"
-    G->>F: "yield"
-    M->>H: "poll until heap root deadline"
+    G->>T: vl_timer_arm(delay_ns)
+    T->>R: validate current Task and runtime
+    R->>G: RUNNING -> SLEEPING
+    R->>H: insert deadline node
+    G->>F: yield
+    M->>H: poll until heap root deadline
     alt deadline expires
-        H->>R: "remove node; timer_result=VL_OK"
+        H->>R: remove node; timer_result=VL_OK
     else another Task cancels
-        T->>R: "remove node; timer_result=CANCELLED"
+        T->>R: remove node; timer_result=CANCELLED
     end
-    R->>G: "SLEEPING -> RUNNABLE"
-    R-->>M: "eventfd wake"
-    M->>F: "resume Fiber"
-    F-->>G: "timer API returns result"
+    R->>G: SLEEPING -> RUNNABLE
+    R-->>M: eventfd wake
+    M->>F: resume Fiber
+    F-->>G: timer API returns result
 ```
 
 ## 7. Memory 流程
@@ -522,81 +522,81 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    participant G as "Task on P"
-    participant A as "Allocator root"
-    participant C as "P-local Cache"
-    participant S as "Span / central list"
-    participant P as "PageHeap"
-    participant O as "Object header"
+    participant G as Task on P
+    participant A as Allocator root
+    participant C as P-local Cache
+    participant S as Span / central list
+    participant P as PageHeap
+    participant O as Object header
 
-    G->>A: "vl_malloc(size <= 32768)"
-    A->>A: "map size to SizeClass"
-    A->>C: "drain remote queue; pop cache"
+    G->>A: vl_malloc(size <= 32768)
+    A->>A: map size to SizeClass
+    A->>C: drain remote queue; pop cache
     alt cache has object
-        C-->>A: "free object"
+        C-->>A: free object
     else cache empty
-        A->>S: "take refill batch"
+        A->>S: take refill batch
         alt no suitable Span
-            S->>P: "mmap pages"
-            P-->>S: "new Span"
+            S->>P: mmap pages
+            P-->>S: new Span
         end
-        S-->>C: "up to refill batch"
-        C-->>A: "pop one object"
+        S-->>C: up to refill batch
+        C-->>A: pop one object
     end
-    A->>O: "set magic, size, capacity, owner P, ALLOCATED"
-    A-->>G: "aligned user pointer"
+    A->>O: set magic, size, capacity, owner P, ALLOCATED
+    A-->>G: aligned user pointer
 ```
 
 ### 7.2 Large allocation、free 和 cross-P free
 
 ```mermaid
 sequenceDiagram
-    participant A as "Allocating P"
-    participant D as "Allocator"
-    participant P as "PageHeap"
-    participant B as "Freeing P"
-    participant RQ as "Owner P remote queue"
-    participant C as "Owner P cache"
+    participant A as Allocating P
+    participant D as Allocator
+    participant P as PageHeap
+    participant B as Freeing P
+    participant RQ as Owner P remote queue
+    participant C as Owner P cache
 
-    A->>D: "vl_malloc(size > 32768)"
-    D->>P: "mmap page-aligned large mapping"
-    D-->>A: "header kind=LARGE + user pointer"
-    A->>B: "pass pointer to another P"
-    B->>D: "vl_free(pointer)"
-    D->>D: "read header owner P"
+    A->>D: vl_malloc(size > 32768)
+    D->>P: mmap page-aligned large mapping
+    D-->>A: header kind=LARGE + user pointer
+    A->>B: pass pointer to another P
+    B->>D: vl_free(pointer)
+    D->>D: read header owner P
     alt small object and freeing P != owner P
-        D->>RQ: "append object to remote[owner_p][class]"
-        D->>D: "cross_p_frees++"
+        D->>RQ: append object to remote[owner_p][class]
+        D->>D: cross_p_frees++
     else large object
-        D->>P: "remove list + munmap"
+        D->>P: remove list + munmap
     else same P small object
-        D->>C: "push cache; mark FREE"
+        D->>C: push cache; mark FREE
     end
-    C->>RQ: "owner P drains at safe point/refill"
+    C->>RQ: owner P drains at safe point/refill
 ```
 
 ### 7.3 Arena reset 和 Pool reuse
 
 ```mermaid
 sequenceDiagram
-    participant H as "HTTP/request owner"
-    participant A as "Arena handle"
-    participant P as "PageHeap"
-    participant Pool as "Pool handle"
-    participant Alloc as "Allocator"
+    participant H as HTTP/request owner
+    participant A as Arena handle
+    participant P as PageHeap
+    participant Pool as Pool handle
+    participant Alloc as Allocator
 
-    H->>A: "vl_arena_init(block_size)"
-    H->>A: "vl_arena_alloc(request data)"
-    A->>P: "map blocks as needed"
-    H->>A: "request teardown -> vl_arena_reset"
-    A->>P: "release every block"
-    A-->>H: "old pointers invalid"
-    H->>Pool: "vl_pool_init(object_size)"
-    Pool->>Alloc: "obtain backing objects"
-    H->>Pool: "alloc -> use -> pool_free"
-    Pool->>Pool: "move object to inactive free list"
-    H->>Pool: "destroy"
-    Pool->>Alloc: "release active and inactive backing objects"
+    H->>A: vl_arena_init(block_size)
+    H->>A: vl_arena_alloc(request data)
+    A->>P: map blocks as needed
+    H->>A: request teardown -> vl_arena_reset
+    A->>P: release every block
+    A-->>H: old pointers invalid
+    H->>Pool: vl_pool_init(object_size)
+    Pool->>Alloc: obtain backing objects
+    H->>Pool: alloc -> use -> pool_free
+    Pool->>Pool: move object to inactive free list
+    H->>Pool: destroy
+    Pool->>Alloc: release active and inactive backing objects
 ```
 
 ## 8. Async I/O 流程
@@ -605,28 +605,28 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    participant A as "Owner application thread"
-    participant I as "I/O root"
-    participant E as "Epoll backend"
-    participant K as "Linux fd"
-    participant C as "Completion queue"
+    participant A as Owner application thread
+    participant I as I/O root
+    participant E as Epoll backend
+    participant K as Linux fd
+    participant C as Completion queue
 
-    A->>I: "Request.task=NULL; vl_io_submit"
-    I->>E: "validate + fd generation + claim"
-    E->>K: "epoll_ctl ADD readiness"
-    I-->>A: "submit returns immediately"
-    A->>I: "vl_io_poll(timeout, completion)"
-    I->>E: "epoll_wait"
-    E->>K: "one nonblocking operation"
-    K-->>E: "result or EAGAIN"
+    A->>I: Request.task=NULL; vl_io_submit
+    I->>E: validate + fd generation + claim
+    E->>K: epoll_ctl ADD readiness
+    I-->>A: submit returns immediately
+    A->>I: vl_io_poll(timeout, completion)
+    I->>E: epoll_wait
+    E->>K: one nonblocking operation
+    K-->>E: result or EAGAIN
     alt EAGAIN
-        E-->>I: "WOULD_BLOCK; waiter remains pending"
+        E-->>I: WOULD_BLOCK; waiter remains pending
     else operation completed
-        E->>C: "queue one Completion"
-        E->>E: "remove waiter + release fd claim"
-        C-->>I: "return Completion"
-        I->>I: "stale check + Request write-back"
-        I-->>A: "vl_io_poll returns"
+        E->>C: queue one Completion
+        E->>E: remove waiter + release fd claim
+        C-->>I: return Completion
+        I->>I: stale check + Request write-back
+        I-->>A: vl_io_poll returns
     end
 ```
 
@@ -634,62 +634,62 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    participant G as "HTTP Connection Task"
-    participant I as "I/O root"
-    participant E as "Epoll backend"
-    participant R as "Runtime root"
-    participant F as "Fiber/root scheduler"
-    participant K as "Linux fd"
+    participant G as HTTP Connection Task
+    participant I as I/O root
+    participant E as Epoll backend
+    participant R as Runtime root
+    participant F as Fiber/root scheduler
+    participant K as Linux fd
 
-    G->>I: "vl_io_submit(Request.task=current Task)"
-    I->>R: "vl_task_can_park_for_io"
-    I->>E: "claim fd + register waiter"
-    I->>R: "vl_task_park_for_io"
-    R->>G: "RUNNING -> WAITING; io_waiting++"
-    G->>F: "yield Fiber"
-    F-->>R: "scheduler continues"
-    R->>I: "P0 worker calls vl_io_poll(0)"
-    I->>E: "poll readiness + execute one operation"
-    E->>K: "recv/send/accept/connect"
-    K-->>E: "result"
-    E-->>I: "Completion(Request, Task, Generation)"
-    I->>I: "stale check; write Request; completed=1"
-    I->>R: "vl_task_complete_io"
-    R->>G: "WAITING -> RUNNABLE; io_waiting--"
-    R-->>F: "wake worker eventfd"
-    F->>G: "resume Fiber"
-    G-->>I: "vl_io_submit returns; read Request.result"
+    G->>I: vl_io_submit(Request.task=current Task)
+    I->>R: vl_task_can_park_for_io
+    I->>E: claim fd + register waiter
+    I->>R: vl_task_park_for_io
+    R->>G: RUNNING -> WAITING; io_waiting++
+    G->>F: yield Fiber
+    F-->>R: scheduler continues
+    R->>I: P0 worker calls vl_io_poll(0)
+    I->>E: poll readiness + execute one operation
+    E->>K: recv/send/accept/connect
+    K-->>E: result
+    E-->>I: Completion(Request, Task, Generation)
+    I->>I: stale check; write Request; completed=1
+    I->>R: vl_task_complete_io
+    R->>G: WAITING -> RUNNABLE; io_waiting--
+    R-->>F: wake worker eventfd
+    F->>G: resume Fiber
+    G-->>I: vl_io_submit returns; read Request.result
 ```
 
 ### 8.3 Task 绑定的 io_uring I/O：command/SQE/CQE/Completion
 
 ```mermaid
 sequenceDiagram
-    participant G as "Task on Runtime owner M"
-    participant I as "I/O root"
-    participant W as "Ring Worker"
-    participant CMD as "Command queue"
-    participant K as "io_uring kernel"
-    participant DONE as "Completion queue"
-    participant R as "Runtime"
+    participant G as Task on Runtime owner M
+    participant I as I/O root
+    participant W as Ring Worker
+    participant CMD as Command queue
+    participant K as io_uring kernel
+    participant DONE as Completion queue
+    participant R as Runtime
 
-    G->>I: "vl_io_submit(Task-bound Request)"
-    I->>I: "validate + generation + fd claim"
-    I->>CMD: "append SUBMIT operation under worker mutex"
-    I->>W: "write eventfd"
-    I->>R: "RUNNING -> WAITING"
-    G-->>R: "yield Fiber"
-    W->>CMD: "drain command"
-    W->>K: "prepare SQE + io_uring_submit"
-    K-->>W: "operation CQE"
-    W->>W: "map cqe->res; resolve operation once"
-    W->>DONE: "publish operation with Request/Task/Generation"
-    R->>I: "P0 calls vl_io_poll"
-    I->>DONE: "consume completion"
-    I->>I: "stale check + Request write-back"
-    I->>R: "vl_task_complete_io"
-    R->>G: "WAITING -> RUNNABLE"
-    G-->>I: "Fiber resumes; submit returns"
+    G->>I: vl_io_submit(Task-bound Request)
+    I->>I: validate + generation + fd claim
+    I->>CMD: append SUBMIT operation under worker mutex
+    I->>W: write eventfd
+    I->>R: RUNNING -> WAITING
+    G-->>R: yield Fiber
+    W->>CMD: drain command
+    W->>K: prepare SQE + io_uring_submit
+    K-->>W: operation CQE
+    W->>W: map cqe->res; resolve operation once
+    W->>DONE: publish operation with Request/Task/Generation
+    R->>I: P0 calls vl_io_poll
+    I->>DONE: consume completion
+    I->>I: stale check + Request write-back
+    I->>R: vl_task_complete_io
+    R->>G: WAITING -> RUNNABLE
+    G-->>I: Fiber resumes; submit returns
 ```
 
 Ring Worker 是 I/O 内部适配器，不是新的领域根；Runtime 仍是 Task state 的
@@ -699,91 +699,91 @@ Ring Worker 是 I/O 内部适配器，不是新的领域根；Runtime 仍是 Tas
 
 ```mermaid
 sequenceDiagram
-    participant A as "I/O owner"
-    participant I as "I/O root"
-    participant B as "Backend"
-    participant R as "Runtime"
-    participant G as "Waiting Task"
-    participant S as "Socket registry"
+    participant A as I/O owner
+    participant I as I/O root
+    participant B as Backend
+    participant R as Runtime
+    participant G as Waiting Task
+    participant S as Socket registry
 
-    A->>I: "vl_io_cancel(request)"
+    A->>I: vl_io_cancel(request)
     alt epoll
-        I->>B: "queue -ECANCELED Completion"
-        B->>B: "delete waiter + release fd claim"
+        I->>B: queue -ECANCELED Completion
+        B->>B: delete waiter + release fd claim
     else io_uring
-        I->>B: "append CANCEL command"
-        B->>B: "submit async-cancel SQE"
-        B-->>B: "cancel CQE is internal"
-        B-->>I: "original operation resolves once"
+        I->>B: append CANCEL command
+        B->>B: submit async-cancel SQE
+        B-->>B: cancel CQE is internal
+        B-->>I: original operation resolves once
     end
-    A->>I: "vl_io_poll to consume resulting Completion"
-    I->>S: "compare Request generation with active fd generation"
+    A->>I: vl_io_poll to consume resulting Completion
+    I->>S: compare Request generation with active fd generation
     alt fd closed/reused
-        S-->>I: "mismatch"
-        I->>I: "result=-ESTALE; add ERROR"
+        S-->>I: mismatch
+        I->>I: result=-ESTALE; add ERROR
     else generation matches
-        I->>I: "preserve operation/cancel result"
+        I->>I: preserve operation/cancel result
     end
-    I->>I: "write Request; completed=1"
-    I->>R: "complete associated Task at most once"
-    R->>G: "WAITING -> RUNNABLE or cancellation result"
+    I->>I: write Request; completed=1
+    I->>R: complete associated Task at most once
+    R->>G: WAITING -> RUNNABLE or cancellation result
 ```
 
 ### 8.5 I/O handle 销毁和 pending operation 清理
 
 ```mermaid
 sequenceDiagram
-    participant A as "Application"
-    participant I as "I/O root"
-    participant W as "Ring Worker or Epoll backend"
-    participant R as "Runtime"
-    participant G as "Task"
-    participant B as "Request buffer"
+    participant A as Application
+    participant I as I/O root
+    participant W as Ring Worker or Epoll backend
+    participant R as Runtime
+    participant G as Task
+    participant B as Request buffer
 
-    A->>A: "stop submitting new operations"
-    A->>I: "vl_io_destroy"
-    I->>W: "stop worker / remove waiters"
-    W->>W: "finish backend ownership cleanup"
-    W-->>I: "no backend operation accesses Request"
-    I-->>A: "I/O handle destroyed"
-    A->>R: "only now request Runtime shutdown"
-    R->>G: "cancel/wake remaining Tasks"
-    R->>B: "no pending Request buffer use"
+    A->>A: stop submitting new operations
+    A->>I: vl_io_destroy
+    I->>W: stop worker / remove waiters
+    W->>W: finish backend ownership cleanup
+    W-->>I: no backend operation accesses Request
+    I-->>A: I/O handle destroyed
+    A->>R: only now request Runtime shutdown
+    R->>G: cancel/wake remaining Tasks
+    R->>B: no pending Request buffer use
 ```
 
 ### 8.6 Socket track、claim、close 和 fd reuse
 
 ```mermaid
 sequenceDiagram
-    participant A as "Application or accept/connect helper"
-    participant S as "Socket registry"
-    participant F as "Linux fd"
-    participant I as "I/O Request"
-    participant B as "Backend"
+    participant A as Application or accept/connect helper
+    participant S as Socket registry
+    participant F as Linux fd
+    participant I as I/O Request
+    participant B as Backend
 
-    A->>F: "create/accept/connect fd"
-    A->>S: "vl_socket_track(fd)"
-    S->>S: "create slot; generation++; active=true"
-    A->>S: "vl_socket_generation(fd)"
-    S-->>I: "capture generation"
-    A->>B: "submit Request(fd, generation)"
-    B->>S: "claim(fd, generation)"
-    S-->>B: "pending_generation set"
+    A->>F: create/accept/connect fd
+    A->>S: vl_socket_track(fd)
+    S->>S: create slot; generation++; active=true
+    A->>S: vl_socket_generation(fd)
+    S-->>I: capture generation
+    A->>B: submit Request(fd, generation)
+    B->>S: claim(fd, generation)
+    S-->>B: pending_generation set
     alt operation completes
-        B->>S: "release pending claim"
-        B-->>I: "Completion with captured generation"
+        B->>S: release pending claim
+        B-->>I: Completion with captured generation
     else close before completion
-        A->>S: "vl_socket_close(fd)"
-        S->>F: "close(fd)"
-        S->>S: "active=false; generation++"
-        B-->>I: "old completion arrives"
-        I->>S: "request_is_stale"
-        S-->>I: "generation mismatch / inactive"
-        I-->>I: "convert result to -ESTALE"
+        A->>S: vl_socket_close(fd)
+        S->>F: close(fd)
+        S->>S: active=false; generation++
+        B-->>I: old completion arrives
+        I->>S: request_is_stale
+        S-->>I: generation mismatch / inactive
+        I-->>I: convert result to -ESTALE
     end
-    A->>F: "OS may reuse integer fd"
-    A->>S: "vl_socket_track(reused fd)"
-    S->>S: "new generation blocks old match"
+    A->>F: OS may reuse integer fd
+    A->>S: vl_socket_track(reused fd)
+    S->>S: new generation blocks old match
 ```
 
 `fd` 是操作系统资源身份，`generation` 才是本上下文用来表达一次 fd
@@ -795,30 +795,30 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    participant L as "Listener fd"
-    participant S as "HTTP Server root"
-    participant RT as "Runtime"
-    participant IO as "I/O root"
-    participant G as "Connection Task"
-    participant P as "Parser"
-    participant C as "Connection state"
+    participant L as Listener fd
+    participant S as HTTP Server root
+    participant RT as Runtime
+    participant IO as I/O root
+    participant G as Connection Task
+    participant P as Parser
+    participant C as Connection state
 
-    L->>S: "accept fd"
-    S->>S: "check shutdown and max_connections"
-    S->>C: "active_connections++"
-    S->>RT: "vl_spawn(connection_task)"
-    RT-->>G: "schedule Task"
-    G->>P: "init parser with config limits"
+    L->>S: accept fd
+    S->>S: check shutdown and max_connections
+    S->>C: active_connections++
+    S->>RT: vl_spawn(connection_task)
+    RT-->>G: schedule Task
+    G->>P: init parser with config limits
     loop fragments of one request
-        G->>IO: "submit RECV with task + generation"
-        IO-->>G: "resume with Request.result"
-        G->>P: "vl_http_parser_feed(data)"
+        G->>IO: submit RECV with task + generation
+        IO-->>G: resume with Request.result
+        G->>P: vl_http_parser_feed(data)
         alt need more
-            P-->>G: "NEED_MORE"
+            P-->>G: NEED_MORE
         else complete
-            P-->>G: "COMPLETE + HTTP Request"
+            P-->>G: COMPLETE + HTTP Request
         else parse error
-            P-->>G: "ERROR + HTTP status"
+            P-->>G: ERROR + HTTP status
         end
     end
 ```
@@ -827,60 +827,60 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    participant G as "Connection Task"
-    participant S as "HTTP Server"
-    participant Q as "HTTP Request"
-    participant Router as "Router"
-    participant H as "Application handler"
-    participant Resp as "Response"
-    participant IO as "I/O root"
-    participant Fd as "Connection fd"
+    participant G as Connection Task
+    participant S as HTTP Server
+    participant Q as HTTP Request
+    participant Router as Router
+    participant H as Application handler
+    participant Resp as Response
+    participant IO as I/O root
+    participant Fd as Connection fd
 
-    G->>Q: "obtain parsed request"
-    G->>Router: "find(method, path)"
+    G->>Q: obtain parsed request
+    G->>Router: find(method, path)
     alt route exists
-        Router-->>G: "Route entry"
-        G->>Resp: "init status=200; keep_alive from Request"
-        G->>H: "handler(Request, Response, user_data)"
-        H->>Resp: "set status/body/chunked"
+        Router-->>G: Route entry
+        G->>Resp: init status=200; keep_alive from Request
+        G->>H: handler(Request, Response, user_data)
+        H->>Resp: set status/body/chunked
     else no route
-        Router-->>G: "NULL"
-        G->>Resp: "build 404 error response"
+        Router-->>G: NULL
+        G->>Resp: build 404 error response
     end
-    G->>IO: "submit SEND header/body chunks"
-    IO->>Fd: "partial/nonblocking send"
-    Fd-->>IO: "bytes written"
-    IO-->>G: "resume until all bytes sent"
-    G->>Fd: "vl_socket_close after current connection task"
-    G->>S: "active_connections--"
-    Note over G,Fd: "Current code closes after one request; keep_alive affects the header only"
+    G->>IO: submit SEND header/body chunks
+    IO->>Fd: partial/nonblocking send
+    Fd-->>IO: bytes written
+    IO-->>G: resume until all bytes sent
+    G->>Fd: vl_socket_close after current connection task
+    G->>S: active_connections--
+    Note over G,Fd: Current code closes after one request; keep_alive affects the header only
 ```
 
 ### 9.3 HTTP 解析错误和有界错误响应
 
 ```mermaid
 sequenceDiagram
-    participant G as "Connection Task"
-    participant P as "Parser"
-    participant Resp as "Error Response"
-    participant IO as "I/O root"
-    participant Fd as "Connection fd"
+    participant G as Connection Task
+    participant P as Parser
+    participant Resp as Error Response
+    participant IO as I/O root
+    participant Fd as Connection fd
 
-    G->>P: "feed fragmented request"
-    P->>P: "check request-line/header/body limits"
+    G->>P: feed fragmented request
+    P->>P: check request-line/header/body limits
     alt malformed syntax
-        P-->>G: "BAD_REQUEST 400"
+        P-->>G: BAD_REQUEST 400
     else invalid length
-        P-->>G: "LENGTH_REQUIRED 411 or BAD_REQUEST"
+        P-->>G: LENGTH_REQUIRED 411 or BAD_REQUEST
     else body too large
-        P-->>G: "PAYLOAD_TOO_LARGE 413"
+        P-->>G: PAYLOAD_TOO_LARGE 413
     else headers too large
-        P-->>G: "HEADER_TOO_LARGE 431"
+        P-->>G: HEADER_TOO_LARGE 431
     end
-    G->>Resp: "construct bounded error body"
-    G->>IO: "task-bound SEND error response"
-    IO-->>G: "send completion"
-    G->>Fd: "close connection"
+    G->>Resp: construct bounded error body
+    G->>IO: task-bound SEND error response
+    IO-->>G: send completion
+    G->>Fd: close connection
 ```
 
 ## 10. Shutdown 和异常流程
@@ -889,60 +889,60 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    participant A as "Application/signal handler"
-    participant S as "HTTP Server"
-    participant L as "Listener"
-    participant RT as "Runtime root"
-    participant G as "Active Connection Tasks"
-    participant IO as "I/O root"
-    participant W as "Workers"
-    participant Mem as "Memory"
+    participant A as Application/signal handler
+    participant S as HTTP Server
+    participant L as Listener
+    participant RT as Runtime root
+    participant G as Active Connection Tasks
+    participant IO as I/O root
+    participant W as Workers
+    participant Mem as Memory
 
-    A->>S: "vl_http_server_request_shutdown"
-    S->>S: "shutdown_requested=true"
-    A->>L: "stop accept + close listener"
-    S-->>RT: "new connection spawn rejected"
+    A->>S: vl_http_server_request_shutdown
+    S->>S: shutdown_requested=true
+    A->>L: stop accept + close listener
+    S-->>RT: new connection spawn rejected
     loop active connections remain
-        RT->>G: "allow request to finish or observe shutdown"
-        G->>IO: "drain/cancel pending I/O"
-        IO-->>G: "completion/cancel result"
-        G->>G: "close fd + parser/resource teardown"
-        G->>S: "active_connections--"
+        RT->>G: allow request to finish or observe shutdown
+        G->>IO: drain/cancel pending I/O
+        IO-->>G: completion/cancel result
+        G->>G: close fd + parser/resource teardown
+        G->>S: active_connections--
     end
-    A->>RT: "vl_runtime_request_shutdown / run"
-    RT->>W: "running=false; wake eventfds"
-    W-->>RT: "executing Fibers returned"
-    RT->>G: "cancel unrun Tasks; wake waiters"
-    A->>IO: "vl_io_destroy after pending ownership ends"
-    A->>Mem: "allocator/arena/pool teardown"
-    A->>RT: "vl_runtime_shutdown"
-    RT->>RT: "destroy Fibers, queues, P/M, Task handles"
+    A->>RT: vl_runtime_request_shutdown / run
+    RT->>W: running=false; wake eventfds
+    W-->>RT: executing Fibers returned
+    RT->>G: cancel unrun Tasks; wake waiters
+    A->>IO: vl_io_destroy after pending ownership ends
+    A->>Mem: allocator/arena/pool teardown
+    A->>RT: vl_runtime_shutdown
+    RT->>RT: destroy Fibers, queues, P/M, Task handles
 ```
 
 ### 10.2 Worker idle、I/O/timer wake 和 deadlock 判定
 
 ```mermaid
 sequenceDiagram
-    participant M as "Worker M/P"
-    participant R as "Runtime"
-    participant Q as "Local/global/steal queues"
-    participant IO as "I/O handle"
-    participant T as "Timer heap"
-    participant E as "eventfd"
+    participant M as Worker M/P
+    participant R as Runtime
+    participant Q as Local/global/steal queues
+    participant IO as I/O handle
+    participant T as Timer heap
+    participant E as eventfd
 
-    M->>Q: "try local pop"
-    M->>Q: "try global pull"
-    M->>Q: "try steal"
+    M->>Q: try local pop
+    M->>Q: try global pull
+    M->>Q: try steal
     alt work found
-        Q-->>M: "eligible Task"
+        Q-->>M: eligible Task
     else no work
-        M->>R: "mark idle"
-        M->>IO: "P0 poll pending I/O"
-        M->>T: "expire timers / compute timeout"
+        M->>R: mark idle
+        M->>IO: P0 poll pending I/O
+        M->>T: expire timers / compute timeout
         alt I/O or timer source exists
-            M->>E: "poll until completion/wakeup"
+            M->>E: poll until completion/wakeup
         else all workers idle, queues empty, Tasks remain, no wake source
-            R->>R: "stop with invalid-state/deadlock result"
+            R->>R: stop with invalid-state/deadlock result
         end
     end
 ```
@@ -954,25 +954,25 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    participant A as "Application"
-    participant R as "Runtime root"
-    participant Mem as "Allocator"
-    participant P as "P / queue / timer resources"
-    participant F as "Fiber scheduler"
-    participant W as "Started workers"
+    participant A as Application
+    participant R as Runtime root
+    participant Mem as Allocator
+    participant P as P / queue / timer resources
+    participant F as Fiber scheduler
+    participant W as Started workers
 
-    A->>R: "vl_runtime_init_with_config"
-    R->>Mem: "vl_allocator_init"
-    R->>P: "allocate P array and init resources in order"
+    A->>R: vl_runtime_init_with_config
+    R->>Mem: vl_allocator_init
+    R->>P: allocate P array and init resources in order
     alt all resources initialize
-        R-->>A: "runtime handle ready"
+        R-->>A: runtime handle ready
     else allocation, queue, eventfd, Fiber, or worker failure
-        R->>W: "stop and join already-started workers"
-        R->>F: "destroy initialized Fiber scheduler"
-        R->>P: "close eventfds; destroy queues and timer heaps"
-        R->>R: "destroy mutex/condvar/impl"
-        R->>Mem: "vl_allocator_shutdown"
-        R-->>A: "error; no partially live Runtime"
+        R->>W: stop and join already-started workers
+        R->>F: destroy initialized Fiber scheduler
+        R->>P: close eventfds; destroy queues and timer heaps
+        R->>R: destroy mutex/condvar/impl
+        R->>Mem: vl_allocator_shutdown
+        R-->>A: error; no partially live Runtime
     end
 ```
 
