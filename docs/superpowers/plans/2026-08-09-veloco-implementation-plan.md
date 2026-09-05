@@ -911,31 +911,31 @@ were updated with implemented ownership and wake protocols.
 - Create: `tests/test_http_parser.c`
 - Create: `tests/test_http_server.c`
 
-- [ ] **Step 1: Define request and response limits**
+- [x] **Step 1: Define request and response limits**
 
 Expose fixed configuration fields for maximum request line, header bytes,
 body bytes, connection count, read timeout, and write timeout. Reject
 over-limit input with a deterministic HTTP status.
 
-- [ ] **Step 2: Write parser tests before implementation**
+- [x] **Step 2: Write parser tests before implementation**
 
 Feed the parser one byte at a time, in fragmented buffers, and as a
 complete request. Test malformed methods, invalid headers, duplicate
 Content-Length, body length limits, and connection tokens.
 
-- [ ] **Step 3: Implement the incremental parser**
+- [x] **Step 3: Implement the incremental parser**
 
 Use an explicit finite-state machine with bounded input accounting.
 Return NEED_MORE, COMPLETE, or ERROR; never scan beyond the supplied
 buffer.
 
-- [ ] **Step 4: Implement router and response writer**
+- [x] **Step 4: Implement router and response writer**
 
 Support method/path route lookup, fixed-length responses, and chunked
 responses. The response writer must handle partial async sends and keep
 the send buffer alive until completion.
 
-- [ ] **Step 5: Implement connection Tasks**
+- [x] **Step 5: Implement connection Tasks**
 
 Accept a connection, allocate its request state from a P-local cache,
 read and parse requests asynchronously, invoke middleware/router, write
@@ -947,7 +947,7 @@ Stop accepting, stop spawning new connection Tasks, close idle
 connections, cancel timed-out active I/O, and wait for active Tasks before
 releasing arenas and runtime state.
 
-- [ ] **Step 7: Run HTTP integration tests**
+- [x] **Step 7: Run HTTP integration tests**
 
 ```bash
 cmake --build build-uring --target veloco_http_example --parallel
@@ -958,7 +958,7 @@ Expected: malformed requests receive bounded errors, valid Keep-Alive
 requests work, partial writes are complete, and shutdown does not leak
 connections or request arenas.
 
-- [ ] **Step 8: Update the HTTP domain model**
+- [x] **Step 8: Update the HTTP domain model**
 
 Update `docs/domain/bounded-contexts.md` with the final HTTP boundary and
 `docs/architecture/http.md` with parser states, connection ownership,

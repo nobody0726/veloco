@@ -106,6 +106,11 @@ add_library(
         src/sync/channel.c
         src/time/timer.c
         src/time/timer_heap.c
+        src/http/http_parser.c
+        src/http/http_router.c
+        src/http/http_response.c
+        src/http/http_connection.c
+        src/http/http_server.c
         ${VELOCO_NET_SOURCES}
         src/memory/arena.c
         src/memory/debug_allocator.c
@@ -139,6 +144,8 @@ add_executable(
     tests/test_io.c
     tests/test_sync.c
     tests/test_timer.c
+    tests/test_http_parser.c
+    tests/test_http_server.c
     ${VELOCO_FIBER_TEST_ASM}
 )
 target_include_directories(
@@ -172,6 +179,7 @@ if(BUILD_TESTING)
     add_test(NAME veloco.io COMMAND veloco_tests --group io)
     add_test(NAME veloco.sync COMMAND veloco_tests --group sync)
     add_test(NAME veloco.timer COMMAND veloco_tests --group timer)
+    add_test(NAME veloco.http COMMAND veloco_tests --group http)
     if(VELOCO_ENABLE_URING)
         add_test(NAME veloco.uring COMMAND veloco_uring_tests)
         set_tests_properties(veloco.uring PROPERTIES SKIP_RETURN_CODE 77)
@@ -189,3 +197,7 @@ target_link_libraries(veloco_bench_fiber PRIVATE veloco veloco_build_options)
 add_executable(bench_alloc benchmarks/bench_alloc.c)
 target_include_directories(bench_alloc PRIVATE "${PROJECT_SOURCE_DIR}/include")
 target_link_libraries(bench_alloc PRIVATE veloco veloco_build_options)
+
+add_executable(veloco-httpd examples/http_server.c)
+target_include_directories(veloco-httpd PRIVATE "${PROJECT_SOURCE_DIR}/include")
+target_link_libraries(veloco-httpd PRIVATE veloco veloco_build_options)

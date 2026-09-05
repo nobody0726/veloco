@@ -7,7 +7,7 @@ reference.
 
 ```mermaid
 flowchart TD
-    App["Application / veloco-httpd"] --> HTTP["HTTP Context<br/>Connection, Parser, Router, Response"]
+    App["Application / veloco-httpd"] --> HTTP["HTTP Context<br/>Connection, Parser, Router, Response, Shutdown"]
     HTTP --> RT["Runtime Context<br/>Task/G, P, M, Fiber, timers, sync"]
     RT --> AIO["Async I/O Context<br/>Backend, SQE, CQE, Generation"]
     RT --> MEM["Memory Context<br/>SizeClass, Span, PageHeap, Arena"]
@@ -23,6 +23,11 @@ Layer responsibilities:
 - HTTP uses the public Runtime and Async I/O APIs from
   `include/veloco/runtime.h`, `include/veloco/task.h`, and
   `include/veloco/io.h`; it never touches Linux primitives directly.
+- A connection task owns the accepted socket, parses the request, routes
+  it, writes the response, and closes the socket on exit.
+- `vl_http_server_request_shutdown()` is cooperative: the application
+  stops the accept loop and lets in-flight connection tasks drain before
+  destroying the server.
 - Runtime schedules Tasks and owns P/M execution.
 - Async I/O submits operations through the Backend interface and maps
   completions back to Tasks; epoll remains a fallback and comparison
